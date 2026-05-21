@@ -38,7 +38,7 @@ export async function loginAction(formData: FormData) {
   
     
     // 1. Call NestJS Backend
-    const res = await fetch('http://localhost:3003/auth/login', {
+    const res = await fetch('process.env.NEXT_PUBLIC_BACKEND_URL/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
