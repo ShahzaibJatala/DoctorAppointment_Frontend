@@ -70,7 +70,7 @@ const LoginContent = () => {
   };
 
   const handleGoogleLogin = () => {
-    window.location.href = 'http://localhost:3003/auth/google';
+    window.location.href = `${process.env.NEXT_PUBLIC_SERVER_URL}/auth/google`;
   }
 
   // ... (Keep all your Forgot Password Logic exactly as it was) ...
