@@ -333,5 +333,8 @@ export default function MyAppointments() {
 
         </div>
     </DashboardShell>
+    </header>
+    </main>
+    </div>
   );
 }
