@@ -10,6 +10,7 @@ import axios from "axios";
 import { getToken } from "@/app/actions/token";
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
 import { setAppointmentStatus as setReduxStatus, AppointmentStatus as ReduxStatus } from "@/lib/redux/features/appointment/appointmentSlice";
+import DashboardShell from '@/components/layouts/DashboardShell';
 
 // --- Types ---
 type AppointmentStatus = ReduxStatus;
@@ -37,15 +38,6 @@ interface AppointmentsClientProps {
 }
 
 // --- Helper Components ---
-const SidebarItem = ({ icon: Icon, label, active = false }: { icon: any, label: string, active?: boolean }) => (
-  <div className={`flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all ${
-    active ? 'bg-teal-50 text-teal-700 font-semibold' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
-  }`}>
-    <Icon size={20} className={active ? 'text-teal-600' : ''} />
-    <span>{label}</span>
-  </div>
-);
-
 const StatusBadge = ({ status }: { status: AppointmentStatus }) => {
   const styles = {
     Upcoming: 'bg-blue-50 text-blue-700 border-blue-200',
@@ -252,38 +244,13 @@ export default function AppointmentsClient({ specialization }: AppointmentsClien
   });
 
   return (
-    <div className="min-h-screen bg-slate-50/50 font-sans text-slate-900 flex">
-      {/* Sidebar */}
-      <aside className="fixed left-0 top-0 h-screen w-64 bg-white border-r border-slate-200 hidden lg:flex flex-col z-20 shadow-sm">
-        <div className="p-6">
-          <div className="flex items-center gap-2 mb-8">
-            <div className="w-8 h-8 bg-teal-600 rounded-lg flex items-center justify-center text-white font-bold">M</div>
-            <span className="text-xl font-bold tracking-tight text-slate-800">MediBook</span>
-          </div>
-          <nav className="space-y-1">
-            <SidebarItem icon={LayoutDashboard} label="Dashboard" />
-            <SidebarItem icon={Calendar} label="My Appointments" active />
-            <SidebarItem icon={Users} label="Patients" />
-            <SidebarItem icon={Star} label="Reviews" />
-            <SidebarItem icon={Settings} label="Settings" />
-          </nav>
-        </div>
-      </aside>
-
-      <main className="flex-1 lg:ml-64 relative">
-        <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-lg border-b border-slate-200 px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4 lg:hidden">
-            <Menu className="text-slate-600" />
-            <span className="font-bold text-xl text-slate-800">MediBook</span>
-          </div>
-          <div className="hidden lg:block">
-            <h1 className="text-xl font-bold text-slate-800">Appointments Manager</h1>
-            {/* Show specialization as a subtitle */}
-            <p className="text-xs text-teal-600 font-medium mt-0.5 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-teal-500 inline-block" />
-              {specialization}
-            </p>
-          </div>
+    <DashboardShell role="doctor" activeHref="/doctor/appointments" sidebarWidth="narrow" showHealthTip={false}>
+        <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-lg border-b border-slate-200 px-4 sm:px-6 py-4">
+          <h1 className="text-lg sm:text-xl font-bold text-slate-800">Appointments Manager</h1>
+          <p className="text-xs text-teal-600 font-medium mt-0.5 flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-teal-500 inline-block" />
+            {specialization}
+          </p>
         </header>
 
         <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
@@ -424,7 +391,6 @@ export default function AppointmentsClient({ specialization }: AppointmentsClien
             )}
           </div>
         </div>
-      </main>
 
       {/* --- MODAL --- */}
       {selectedAppointment && (
@@ -532,6 +498,6 @@ export default function AppointmentsClient({ specialization }: AppointmentsClien
           </div>
         </div>
       )}
-    </div>
+    </DashboardShell>
   );
 }

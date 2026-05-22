@@ -69,21 +69,21 @@ function StepIndicator({ step }: { step: BookingStep }) {
   ];
   const current = steps.findIndex(s => s.key === step);
   return (
-    <div className="flex items-center mb-8">
+    <div className="flex items-center mb-8 overflow-x-auto pb-1 -mx-1 px-1">
       {steps.map((s, idx) => (
         <React.Fragment key={s.key}>
-          <div className="flex flex-col items-center gap-1.5">
-            <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-300 ${
+          <div className="flex flex-col items-center gap-1.5 shrink-0">
+            <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-300 ${
               idx < current ? 'bg-teal-600 text-white' :
               idx === current ? 'bg-teal-600 text-white ring-4 ring-teal-100' :
               'bg-slate-100 text-slate-400'
             }`}>
               {idx < current ? <Check size={16} strokeWidth={3} /> : idx + 1}
             </div>
-            <span className={`text-xs font-semibold ${idx <= current ? 'text-teal-700' : 'text-slate-400'}`}>{s.label}</span>
+            <span className={`text-[10px] sm:text-xs font-semibold whitespace-nowrap ${idx <= current ? 'text-teal-700' : 'text-slate-400'}`}>{s.label}</span>
           </div>
           {idx < steps.length - 1 && (
-            <div className={`flex-1 h-0.5 mx-3 mb-5 rounded-full transition-all duration-500 ${idx < current ? 'bg-teal-500' : 'bg-slate-200'}`} />
+            <div className={`flex-1 min-w-[24px] sm:min-w-[40px] h-0.5 mx-2 sm:mx-3 mb-5 rounded-full transition-all duration-500 ${idx < current ? 'bg-teal-500' : 'bg-slate-200'}`} />
           )}
         </React.Fragment>
       ))}
@@ -167,13 +167,35 @@ export default function GetAppointmentPage() {
   const handleConfirm = async () => {
     setIsSubmitting(true);
     setErrorMessage('');
+    
     try {
       const token = await getToken();
-      if (!token) { setErrorMessage('Please log in to book an appointment.'); return; }
+      if (!token) { 
+        setErrorMessage('Please log in to book an appointment.'); 
+        return; 
+      }
 
       const startDateTime = parseSlotToDateTime(days[selectedDayIdx].date, selectedTime!);
       const endDateTime = new Date(startDateTime.getTime() + 30 * 60000);
 
+      // --- STEP 1: INITIALIZE PAYMENT ---
+      // Notice there is no inner try/catch. If this fails, it jumps straight to the bottom!
+      const stripeResponse = await axios.post(
+        `${serverUrl}/payment/create-checkout-session`,
+        { productId: '123' }, 
+        { withCredentials: true } 
+      );
+
+      // --- STEP 2: REDIRECT ---
+      if (stripeResponse.data.url) {
+        window.location.href = stripeResponse.data.url;
+        // CRITICAL: Return immediately. This stops the function so the addPatient API 
+        // doesn't fire while the browser is navigating to Stripe.
+        return; 
+      }
+
+      // --- STEP 3: ADD PATIENT (Fallback for non-Stripe flows) ---
+      // This will ONLY run if the Stripe URL wasn't returned, but no error was thrown.
       await axios.post(`${serverUrl}/doctor/addPatient`, {
         doctorId,
         startTime: startDateTime.toISOString(),
@@ -190,7 +212,15 @@ export default function GetAppointmentPage() {
 
       setStep('confirmed');
     } catch (err: any) {
-      setErrorMessage(err.response?.data?.message || 'Failed to book. Please try again.');
+      // If Stripe or the database fails, it stops execution and lands right here.
+      console.error('Submission error:', err);
+      
+      // We check for 'error' first, which is what your NestJS Stripe controller sends back
+      setErrorMessage(
+        err.response?.data?.error || 
+        err.response?.data?.message || 
+        'Failed to process your request. Please try again.'
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -325,12 +355,12 @@ export default function GetAppointmentPage() {
                       <Calendar size={15} className="text-teal-600" /> Select Date
                       <span className="ml-auto text-xs text-slate-400 font-normal">Next 7 days</span>
                     </h3>
-                    <div className="grid grid-cols-7 gap-2">
+                    <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide sm:grid sm:grid-cols-7 sm:overflow-visible sm:pb-0 sm:mx-0 sm:px-0">
                       {days.map((d, i) => (
                         <button
                           key={i}
                           onClick={() => { setSelectedDayIdx(i); setSelectedTime(null); }}
-                          className={`flex flex-col items-center py-3 rounded-xl border-2 transition-all ${
+                          className={`flex flex-col items-center py-3 px-2 sm:px-0 min-w-[3.25rem] sm:min-w-0 shrink-0 sm:shrink rounded-xl border-2 transition-all ${
                             selectedDayIdx === i
                               ? 'bg-teal-600 border-teal-600 text-white shadow-md'
                               : 'bg-white border-slate-200 text-slate-600 hover:border-teal-300 hover:bg-teal-50/50'

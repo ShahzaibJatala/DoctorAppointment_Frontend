@@ -44,6 +44,7 @@ export default function FindDoctorPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSpecialty, setSelectedSpecialty] = useState('All');
   const [mockDoctors, setMockDoctors] = useState<Doctor[]>([]);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL;
 
@@ -144,10 +145,19 @@ export default function FindDoctorPage() {
       </div>
 
       {/* --- Main Content --- */}
-      <div className="max-w-7xl mx-auto px-6 -mt-12 relative z-20 flex flex-col lg:flex-row gap-8 pb-16">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 -mt-12 relative z-20 flex flex-col lg:flex-row gap-8 pb-16">
         
+        {/* Mobile filter overlay */}
+        {filtersOpen && (
+          <div
+            className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm lg:hidden"
+            onClick={() => setFiltersOpen(false)}
+            aria-hidden
+          />
+        )}
+
         {/* Sidebar Filters */}
-        <aside className="w-full lg:w-72 shrink-0 space-y-5">
+        <aside className={`w-full lg:w-72 shrink-0 space-y-5 fixed lg:static inset-y-0 left-0 z-50 lg:z-auto max-w-[85vw] lg:max-w-none overflow-y-auto bg-white lg:bg-transparent p-4 lg:p-0 shadow-2xl lg:shadow-none transition-transform duration-300 lg:translate-x-0 ${filtersOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
           <div className="bg-white p-6 rounded-2xl shadow-elevated border border-slate-100 animate-fade-up">
             <div className="flex items-center justify-between font-bold text-slate-800 mb-5 pb-4 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
@@ -156,6 +166,14 @@ export default function FindDoctorPage() {
                 </div>
                 <span>Filters</span>
               </div>
+              <button
+                type="button"
+                className="lg:hidden p-2 rounded-lg text-slate-500 hover:bg-slate-100"
+                onClick={() => setFiltersOpen(false)}
+                aria-label="Close filters"
+              >
+                <X size={18} />
+              </button>
               {selectedSpecialty !== 'All' && (
                 <button 
                   onClick={() => setSelectedSpecialty('All')}
@@ -197,16 +215,26 @@ export default function FindDoctorPage() {
 
         {/* Doctor List */}
         <div className="flex-1">
-          <div className="mb-6 flex items-center justify-between animate-fade-up" style={{ animationDelay: '0.05s' }}>
-            <div>
-              <h2 className="text-xl font-bold text-slate-800">
-                {filteredDoctors.length} {filteredDoctors.length === 1 ? 'doctor' : 'doctors'} found
-              </h2>
-              <p className="text-sm text-slate-400 mt-0.5">
-                {selectedSpecialty === 'All' ? 'Showing all specialties' : `Filtered by ${selectedSpecialty}`}
-              </p>
+          <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fade-up" style={{ animationDelay: '0.05s' }}>
+            <div className="flex items-start justify-between gap-3 sm:block">
+              <div>
+                <h2 className="text-xl font-bold text-slate-800">
+                  {filteredDoctors.length} {filteredDoctors.length === 1 ? 'doctor' : 'doctors'} found
+                </h2>
+                <p className="text-sm text-slate-400 mt-0.5">
+                  {selectedSpecialty === 'All' ? 'Showing all specialties' : `Filtered by ${selectedSpecialty}`}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFiltersOpen(true)}
+                className="lg:hidden flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 shrink-0"
+              >
+                <SlidersHorizontal size={16} />
+                Filters
+              </button>
             </div>
-            <select className="bg-white border border-slate-200 text-slate-600 text-sm rounded-xl focus:ring-2 focus:ring-[#16BCC8]/20 focus:border-[#16BCC8] px-4 py-2.5 cursor-pointer transition-all duration-200 hover:border-slate-300">
+            <select className="w-full sm:w-auto bg-white border border-slate-200 text-slate-600 text-sm rounded-xl focus:ring-2 focus:ring-[#16BCC8]/20 focus:border-[#16BCC8] px-4 py-2.5 cursor-pointer transition-all duration-200 hover:border-slate-300">
               <option>Recommended</option>
               <option>Highest Rated</option>
               <option>Lowest Fee</option>

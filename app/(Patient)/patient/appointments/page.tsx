@@ -26,6 +26,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import Link from 'next/link';
+import DashboardShell from '@/components/layouts/DashboardShell';
 
 // --- Types ---
 type AppointmentStatus = 'Confirmed' | 'Pending' | 'Completed' | 'Cancelled';
@@ -101,17 +102,6 @@ const allAppointments: Appointment[] = [
 
 // --- Components ---
 
-const SidebarItem = ({ icon: Icon, label, active = false }: { icon: any, label: string, active?: boolean }) => (
-  <div className={`flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all duration-200 group ${
-    active 
-      ? 'bg-[#16BCC8]/8 text-[#16BCC8] font-semibold' 
-      : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
-  }`}>
-    <Icon size={20} className={`transition-colors duration-200 ${active ? 'text-[#16BCC8]' : 'group-hover:text-[#16BCC8]'}`} />
-    <span>{label}</span>
-  </div>
-);
-
 const StatusBadge = ({ status }: { status: AppointmentStatus }) => {
   const styles = {
     Confirmed: 'bg-[#20AC6B]/10 text-[#20AC6B] border-[#20AC6B]/20',
@@ -171,44 +161,9 @@ export default function MyAppointments() {
   });
 
   return (
-    <div className="min-h-screen bg-slate-50/50 flex">
-      
-      {/* --- Sidebar (Hidden on Mobile) --- */}
-      <aside className="fixed left-0 top-0 h-screen w-72 bg-white border-r border-slate-100 hidden lg:flex flex-col z-20 shadow-sm">
-        <div className="p-7">
-          <Link href="/" className="flex items-center gap-2.5 mb-9 group">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#16BCC8] to-[#0ea5a9] shadow-[0_2px_8px_rgba(22,188,200,0.3)] transition-transform duration-300 group-hover:scale-105">
-              <Heart className="h-[18px] w-[18px] text-white" />
-            </div>
-            <span className="text-xl font-bold tracking-tight text-slate-800">MediBook</span>
-          </Link>
-
-          <nav className="space-y-1">
-            <SidebarItem icon={LayoutDashboard} label="Dashboard" />
-            <SidebarItem icon={Search} label="Find Doctors" />
-            <SidebarItem icon={Calendar} label="My Appointments" active />
-            <SidebarItem icon={FileText} label="Prescriptions" />
-            <SidebarItem icon={ClipboardList} label="Medical Records" />
-          </nav>
-        </div>
-
-        <div className="mt-auto p-6 border-t border-slate-100">
-          <SidebarItem icon={Settings} label="Settings" />
-          <SidebarItem icon={LogOut} label="Logout" />
-        </div>
-      </aside>
-
-      {/* --- Main Content --- */}
-      <main className="flex-1 lg:ml-72">
-        
-        {/* Top Navbar */}
-        <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl border-b border-slate-100 px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4 lg:hidden">
-            <Menu className="text-slate-500" />
-            <span className="font-bold text-lg text-slate-800">MediBook</span>
-          </div>
-
-          <h1 className="text-xl font-bold text-slate-800 hidden lg:block">My Appointments</h1>
+    <DashboardShell role="patient" activeHref="/patient/appointments">
+        <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl border-b border-slate-100 px-4 sm:px-6 py-4 flex items-center justify-between">
+          <h1 className="text-lg sm:text-xl font-bold text-slate-800">My Appointments</h1>
 
           <div className="flex items-center gap-4">
             <button className="relative p-2.5 rounded-xl hover:bg-slate-50 transition-all duration-200 border border-transparent hover:border-slate-100">
@@ -358,7 +313,6 @@ export default function MyAppointments() {
           </div>
 
         </div>
-      </main>
-    </div>
+    </DashboardShell>
   );
 }

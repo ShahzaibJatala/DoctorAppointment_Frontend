@@ -9,7 +9,6 @@ import {
   Star,
   Settings,
   Bell,
-  Menu,
   MapPin,
   Video,
   Clock,
@@ -24,6 +23,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import Link from 'next/link';
+import DashboardShell from '@/components/layouts/DashboardShell';
 
 // --- Types ---
 type Appointment = {
@@ -87,20 +87,6 @@ function HeartIcon({ className }: { className?: string }) { return <Heart classN
 
 // --- Components ---
 
-const SidebarItem = ({ icon: Icon, label, active = false, href }: { icon: any, label: string, active?: boolean, href?: string }) => {
-  const content = (
-    <div className={`flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all duration-200 group ${
-      active 
-        ? 'bg-[#16BCC8]/8 text-[#16BCC8] font-semibold' 
-        : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
-    }`}>
-      <Icon size={20} className={`transition-colors duration-200 ${active ? 'text-[#16BCC8]' : 'group-hover:text-[#16BCC8]'}`} />
-      <span>{label}</span>
-    </div>
-  );
-  return href ? <Link href={href}>{content}</Link> : content;
-};
-
 const QuickActionCard = ({ icon: Icon, title, desc, color }: { icon: any, title: string, desc: string, color: string }) => (
   <button className="flex flex-col items-start p-5 bg-white border border-slate-100 rounded-2xl hover:shadow-elevated hover:border-[#16BCC8]/15 hover:-translate-y-0.5 transition-all duration-300 text-left w-full group">
     <div className={`p-3 rounded-xl ${color} mb-3 group-hover:scale-110 transition-transform duration-300 shadow-sm`}>
@@ -158,57 +144,10 @@ const AppointmentRow = ({ apt }: { apt: Appointment }) => (
 
 export default function PatientDashboard() {
   return (
-    <div className="min-h-screen bg-slate-50/50 flex">
-      
-      {/* --- Sidebar --- */}
-      <aside className="fixed left-0 top-0 h-screen w-72 bg-white border-r border-slate-100 hidden lg:flex flex-col z-20 shadow-sm">
-        <div className="p-7">
-          <Link href="/" className="flex items-center gap-2.5 mb-9 group">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#16BCC8] to-[#0ea5a9] shadow-[0_2px_8px_rgba(22,188,200,0.3)] transition-transform duration-300 group-hover:scale-105">
-              <Heart className="h-[18px] w-[18px] text-white" />
-            </div>
-            <span className="text-xl font-bold tracking-tight text-slate-800">MediBook</span>
-          </Link>
-
-          <nav className="space-y-1">
-            <SidebarItem icon={LayoutDashboard} label="Dashboard" active />
-            <SidebarItem icon={Search} label="Find Doctors" href="/patient/findDoctors" />
-            <SidebarItem icon={Calendar} label="My Appointments" />
-            <SidebarItem icon={FileText} label="Prescriptions" />
-            <SidebarItem icon={ClipboardList} label="Medical Records" />
-            <SidebarItem icon={Star} label="Reviews" />
-          </nav>
-        </div>
-
-        <div className="mt-auto p-6 border-t border-slate-100">
-          <SidebarItem icon={Settings} label="Settings" />
-          
-          <div className="mt-6 bg-gradient-to-br from-[#16BCC8]/8 to-[#0ea5a9]/5 rounded-2xl p-4 border border-[#16BCC8]/10">
-             <div className="flex items-start gap-3">
-               <div className="p-2 bg-white rounded-xl text-[#16BCC8] shadow-sm">
-                 <ShieldCheck size={18} />
-               </div>
-               <div>
-                 <p className="text-sm font-bold text-[#16BCC8]">Health Tip</p>
-                 <p className="text-xs text-slate-500 mt-1 leading-relaxed">Drink 8 cups of water daily to stay hydrated.</p>
-               </div>
-             </div>
-          </div>
-        </div>
-      </aside>
-
-      {/* --- Main Content --- */}
-      <main className="flex-1 lg:ml-72">
-        
-        {/* Navbar */}
-        <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl border-b border-slate-100 px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4 lg:hidden">
-            <Menu className="text-slate-500" />
-            <span className="font-bold text-lg text-slate-800">MediBook</span>
-          </div>
-
-          <div className="hidden lg:block">
-            <h1 className="text-xl font-bold text-slate-800">Welcome back, Alex 👋</h1>
+    <DashboardShell role="patient" activeHref="/patient/dashboard">
+        <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl border-b border-slate-100 px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-lg sm:text-xl font-bold text-slate-800">Welcome back, Alex 👋</h1>
             <p className="text-sm text-slate-400">How are you feeling today?</p>
           </div>
 
@@ -365,7 +304,6 @@ export default function PatientDashboard() {
 
           </div>
         </div>
-      </main>
-    </div>
+    </DashboardShell>
   );
 }
