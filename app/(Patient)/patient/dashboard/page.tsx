@@ -173,9 +173,9 @@ export default function PatientDashboard() {
           <nav className="space-y-1">
             <SidebarItem icon={LayoutDashboard} label="Dashboard" active />
             <SidebarItem icon={Search} label="Find Doctors" href="/patient/findDoctors" />
-            <SidebarItem icon={Calendar} label="My Appointments" />
+            <SidebarItem icon={Calendar} label="My Appointments" href='/patient/appointments' />
             <SidebarItem icon={FileText} label="Prescriptions" />
-            <SidebarItem icon={ClipboardList} label="Medical Records" />
+            <SidebarItem icon={ClipboardList} label="Medical Records" href='/patient/history' />
             <SidebarItem icon={Star} label="Reviews" />
           </nav>
         </div>

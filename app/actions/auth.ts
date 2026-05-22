@@ -12,7 +12,7 @@ export async function registerAction(formData: FormData) {
   const age = formData.get('age')
   
   // 1. Call NestJS Backend
-  const res = await fetch('http://localhost:3003/auth/register', {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, age : Number(age), email, password, role }),
@@ -38,7 +38,9 @@ export async function loginAction(formData: FormData) {
   
     
     // 1. Call NestJS Backend
-    const res = await fetch('process.env.NEXT_PUBLIC_BACKEND_URL/auth/login', {
+
+    const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/auth/login`, {
+
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
@@ -87,7 +89,7 @@ export async function loginAction(formData: FormData) {
 
 
 export async function googleAuth(googleData : {email:string}) {
-  const res = await fetch('http://127.0.0.1:3003/auth/google', {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/auth/google`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email : googleData.email }),

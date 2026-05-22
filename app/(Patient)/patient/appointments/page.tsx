@@ -174,29 +174,7 @@ export default function MyAppointments() {
     <div className="min-h-screen bg-slate-50/50 flex">
       
       {/* --- Sidebar (Hidden on Mobile) --- */}
-      <aside className="fixed left-0 top-0 h-screen w-72 bg-white border-r border-slate-100 hidden lg:flex flex-col z-20 shadow-sm">
-        <div className="p-7">
-          <Link href="/" className="flex items-center gap-2.5 mb-9 group">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#16BCC8] to-[#0ea5a9] shadow-[0_2px_8px_rgba(22,188,200,0.3)] transition-transform duration-300 group-hover:scale-105">
-              <Heart className="h-[18px] w-[18px] text-white" />
-            </div>
-            <span className="text-xl font-bold tracking-tight text-slate-800">MediBook</span>
-          </Link>
-
-          <nav className="space-y-1">
-            <SidebarItem icon={LayoutDashboard} label="Dashboard" />
-            <SidebarItem icon={Search} label="Find Doctors" />
-            <SidebarItem icon={Calendar} label="My Appointments" active />
-            <SidebarItem icon={FileText} label="Prescriptions" />
-            <SidebarItem icon={ClipboardList} label="Medical Records" />
-          </nav>
-        </div>
-
-        <div className="mt-auto p-6 border-t border-slate-100">
-          <SidebarItem icon={Settings} label="Settings" />
-          <SidebarItem icon={LogOut} label="Logout" />
-        </div>
-      </aside>
+     
 
       {/* --- Main Content --- */}
       <main className="flex-1 lg:ml-72">
