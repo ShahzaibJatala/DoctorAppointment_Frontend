@@ -8,6 +8,11 @@ export const metadata: Metadata = {
   keywords: "doctor appointment, healthcare, medical booking, online consultation, MediBook",
 };
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{

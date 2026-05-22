@@ -20,6 +20,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import Link from 'next/link';
+import DashboardShell from '@/components/layouts/DashboardShell';
 
 // --- Types for Static Data ---
 type Appointment = {
@@ -65,13 +66,6 @@ const topDoctors: Doctor[] = [
 
 // --- Components ---
 
-const SidebarItem = ({ icon: Icon, label, active = false }: { icon: any, label: string, active?: boolean }) => (
-  <div className={`flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all duration-200 group ${active ? 'bg-[#16BCC8]/8 text-[#16BCC8] font-semibold' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'}`}>
-    <Icon size={20} className={`transition-colors duration-200 ${active ? 'text-[#16BCC8]' : 'group-hover:text-[#16BCC8]'}`} />
-    <span>{label}</span>
-  </div>
-);
-
 const StatusBadge = ({ status }: { status: Appointment['status'] }) => {
   const styles = {
     Confirmed: 'bg-[#20AC6B]/10 text-[#20AC6B] border-[#20AC6B]/20',
@@ -97,51 +91,9 @@ const StatusBadge = ({ status }: { status: Appointment['status'] }) => {
 
 export default function AdminDashboard() {
   return (
-    <div className="min-h-screen bg-slate-50/50 flex">
-      
-      {/* --- Sidebar --- */}
-      <aside className="fixed left-0 top-0 h-screen w-72 bg-white border-r border-slate-100 hidden lg:flex flex-col z-20 shadow-sm">
-        <div className="p-7">
-          <Link href="/" className="flex items-center gap-2.5 mb-9 group">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#16BCC8] to-[#0ea5a9] shadow-[0_2px_8px_rgba(22,188,200,0.3)] transition-transform duration-300 group-hover:scale-105">
-              <Activity className="h-[18px] w-[18px] text-white" />
-            </div>
-            <span className="text-xl font-bold tracking-tight text-slate-800">MediBook</span>
-          </Link>
-
-          <nav className="space-y-1">
-            <SidebarItem icon={LayoutDashboard} label="Dashboard" active />
-            <SidebarItem icon={Stethoscope} label="Doctors" />
-            <SidebarItem icon={Users} label="Patients" />
-            <SidebarItem icon={CalendarCheck} label="Appointments" />
-            <SidebarItem icon={Activity} label="Specialties" />
-            <SidebarItem icon={Star} label="Reviews" />
-          </nav>
-        </div>
-
-        <div className="mt-auto p-6 border-t border-slate-100">
-          <SidebarItem icon={Settings} label="Settings" />
-          <div className="mt-6 flex items-center gap-3 p-3.5 bg-slate-50/80 rounded-2xl border border-slate-100">
-            <img src="https://i.pravatar.cc/150?u=admin" alt="Admin" className="h-10 w-10 rounded-xl border-2 border-white shadow-sm" />
-            <div className="flex flex-col min-w-0">
-              <span className="text-sm font-bold text-slate-800 truncate">Dr. Admin</span>
-              <span className="text-xs text-[#16BCC8] font-medium">Super Admin</span>
-            </div>
-          </div>
-        </div>
-      </aside>
-
-      {/* --- Main Content --- */}
-      <main className="flex-1 lg:ml-72">
-        
-        {/* Top Navbar */}
-        <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl border-b border-slate-100 px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4 lg:hidden">
-            <Menu className="text-slate-500" />
-            <span className="font-bold text-lg">MediBook</span>
-          </div>
-          
-          <h1 className="text-2xl font-bold text-slate-800 hidden lg:block">Admin Dashboard</h1>
+    <DashboardShell role="admin" activeHref="/admin/dashboard" sidebarWidth="narrow" showHealthTip={false}>
+        <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl border-b border-slate-100 px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Admin Dashboard</h1>
 
           <div className="flex items-center gap-4">
             <div className="hidden md:flex items-center bg-slate-50 rounded-xl px-4 py-2.5 w-72 border border-transparent focus-within:border-[#16BCC8]/30 focus-within:ring-2 focus-within:ring-[#16BCC8]/10 transition-all duration-200">
@@ -270,7 +222,6 @@ export default function AdminDashboard() {
 
           </div>
         </div>
-      </main>
-    </div>
+    </DashboardShell>
   );
 }

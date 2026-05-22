@@ -26,6 +26,7 @@ import {
   Video
 } from 'lucide-react';
 import Link from 'next/link';
+import DashboardShell from '@/components/layouts/DashboardShell';
 
 // --- Types ---
 type RecordType = 'In-Clinic' | 'Video' | 'Lab Test';
@@ -102,17 +103,6 @@ const stats = [
 
 // --- Components ---
 
-const SidebarItem = ({ icon: Icon, label, active = false }: { icon: any, label: string, active?: boolean }) => (
-  <div className={`flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all duration-200 group ${
-    active 
-      ? 'bg-[#16BCC8]/8 text-[#16BCC8] font-semibold' 
-      : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
-  }`}>
-    <Icon size={20} className={`transition-colors duration-200 ${active ? 'text-[#16BCC8]' : 'group-hover:text-[#16BCC8]'}`} />
-    <span>{label}</span>
-  </div>
-);
-
 const DocumentCard = ({ doc }: { doc: { name: string, size: string, type: string } }) => (
   <div className="flex items-center justify-between p-3.5 bg-slate-50/80 border border-slate-100 rounded-xl hover:border-[#16BCC8]/20 hover:bg-[#16BCC8]/[0.03] transition-all duration-200 group">
     <div className="flex items-center gap-3 overflow-hidden">
@@ -140,6 +130,7 @@ export default function MedicalHistory() {
   };
 
   return (
+
     <div className="min-h-screen bg-slate-50/50 flex">
       
       {/* --- Sidebar --- */}
@@ -156,6 +147,11 @@ export default function MedicalHistory() {
           </div>
 
           <h1 className="text-xl font-bold text-slate-800 hidden lg:block">Medical History</h1>
+
+    <DashboardShell role="patient" activeHref="/patient/history">
+        <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl border-b border-slate-100 px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <h1 className="text-lg sm:text-xl font-bold text-slate-800">Medical History</h1>
+
 
           <div className="flex items-center gap-4">
             <div className="hidden md:flex items-center bg-slate-50 rounded-xl px-4 py-2.5 w-64 focus-within:ring-2 focus-within:ring-[#16BCC8]/20 focus-within:border-[#16BCC8] border border-transparent transition-all duration-200">
@@ -426,7 +422,6 @@ export default function MedicalHistory() {
           )}
 
         </div>
-      </main>
-    </div>
+    </DashboardShell>
   );
 }

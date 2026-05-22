@@ -26,6 +26,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import Link from 'next/link';
+import DashboardShell from '@/components/layouts/DashboardShell';
 
 // --- Types ---
 type AppointmentStatus = 'Confirmed' | 'Pending' | 'Completed' | 'Cancelled';
@@ -101,17 +102,6 @@ const allAppointments: Appointment[] = [
 
 // --- Components ---
 
-const SidebarItem = ({ icon: Icon, label, active = false }: { icon: any, label: string, active?: boolean }) => (
-  <div className={`flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all duration-200 group ${
-    active 
-      ? 'bg-[#16BCC8]/8 text-[#16BCC8] font-semibold' 
-      : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
-  }`}>
-    <Icon size={20} className={`transition-colors duration-200 ${active ? 'text-[#16BCC8]' : 'group-hover:text-[#16BCC8]'}`} />
-    <span>{label}</span>
-  </div>
-);
-
 const StatusBadge = ({ status }: { status: AppointmentStatus }) => {
   const styles = {
     Confirmed: 'bg-[#20AC6B]/10 text-[#20AC6B] border-[#20AC6B]/20',
@@ -171,6 +161,7 @@ export default function MyAppointments() {
   });
 
   return (
+
     <div className="min-h-screen bg-slate-50/50 flex">
       
       {/* --- Sidebar (Hidden on Mobile) --- */}
@@ -187,6 +178,11 @@ export default function MyAppointments() {
           </div>
 
           <h1 className="text-xl font-bold text-slate-800 hidden lg:block">My Appointments</h1>
+
+    <DashboardShell role="patient" activeHref="/patient/appointments">
+        <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl border-b border-slate-100 px-4 sm:px-6 py-4 flex items-center justify-between">
+          <h1 className="text-lg sm:text-xl font-bold text-slate-800">My Appointments</h1>
+
 
           <div className="flex items-center gap-4">
             <button className="relative p-2.5 rounded-xl hover:bg-slate-50 transition-all duration-200 border border-transparent hover:border-slate-100">
@@ -336,7 +332,6 @@ export default function MyAppointments() {
           </div>
 
         </div>
-      </main>
-    </div>
+    </DashboardShell>
   );
 }

@@ -21,6 +21,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import Link from 'next/link';
+import DashboardShell from '@/components/layouts/DashboardShell';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { removeToken } from '@/app/actions/token';
@@ -66,16 +67,6 @@ const reviews: Review[] = [
 ];
 
 // --- Components ---
-const SidebarItem = ({ icon: Icon, label, active = false, badge }: { icon: any, label: string, active?: boolean, badge?: string }) => (
-  <div className={`flex items-center justify-between px-4 py-3 rounded-xl cursor-pointer transition-all duration-200 group ${active ? 'bg-[#16BCC8]/8 text-[#16BCC8] font-semibold' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'}`}>
-    <div className="flex items-center gap-3">
-      <Icon size={20} className={`transition-colors duration-200 ${active ? 'text-[#16BCC8]' : 'group-hover:text-[#16BCC8]'}`} />
-      <span>{label}</span>
-    </div>
-    {badge && <span className="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">{badge}</span>}
-  </div>
-);
-
 const AppointmentCard = ({ apt }: { apt: Appointment }) => (
   <div className="flex items-center justify-between p-5 bg-white border border-slate-100 rounded-2xl hover:shadow-elevated hover:border-[#16BCC8]/10 transition-all duration-300 group">
     <div className="flex items-center gap-4">
@@ -182,69 +173,14 @@ export default async function DoctorDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50/50 flex">
-      
-      {/* --- Sidebar --- */}
-      <aside className="fixed left-0 top-0 h-screen w-72 bg-white border-r border-slate-100 hidden xl:flex flex-col z-20 shadow-sm">
-        <div className="p-7">
-          <Link href="/" className="flex items-center gap-2.5 mb-9 group">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#16BCC8] to-[#0ea5a9] shadow-[0_2px_8px_rgba(22,188,200,0.3)] transition-transform duration-300 group-hover:scale-105">
-              <Heart className="h-[18px] w-[18px] text-white" />
-            </div>
-            <span className="text-xl font-bold tracking-tight text-slate-800">MediBook</span>
-          </Link>
-
-          <div className="space-y-1">
-            <p className="px-4 text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">Main</p>
-            <SidebarItem icon={LayoutDashboard} label="Dashboard" active />
-            <SidebarItem icon={CalendarDays} label="Schedule" />
-            <SidebarItem icon={Users} label="My Patients" />
-            <SidebarItem icon={MessageSquare} label="Messages" badge="3" />
-          </div>
-
-          <div className="space-y-1 mt-8">
-            <p className="px-4 text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">Practice</p>
-            <SidebarItem icon={Wallet} label="Earnings" />
-            <SidebarItem icon={Star} label="Reviews" />
-            <SidebarItem icon={Settings} label="Settings" />
-          </div>
-        </div>
-
-        <div className="mt-auto p-6 border-t border-slate-100">
-          <div className="flex items-center gap-3 p-3.5 bg-slate-50/80 rounded-2xl border border-slate-100">
-            <Link href="/doctor/profile" className="relative">
-              <img src={profilePhotoUrl} alt={doctorName} className="w-11 h-11 rounded-xl object-cover border-2 border-white shadow-sm" />
-              <span className="absolute bottom-0 right-0 w-3 h-3 bg-[#20AC6B] border-2 border-white rounded-full"></span>
-            </Link>
-            <Link href="/doctor/profile" className="flex-1 min-w-0">
-              <h4 className="text-sm font-bold text-slate-800 truncate">{doctorName}</h4>
-              <p className="text-xs text-[#16BCC8] font-medium truncate">{specialization}</p>
-            </Link>
-            <button onClick={handleLogout} className="flex items-center gap-2 text-slate-300 hover:text-red-500 transition-colors duration-200 cursor-pointer">
-              <LogOut size={18} />
-            </button>
-          </div>
-        </div>
-      </aside>
-
-      {/* --- Main Content --- */}
-      <main className="flex-1 xl:ml-72">
-        
-        {/* Top Navbar */}
-        <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl border-b border-slate-100 px-8 py-5 flex items-center justify-between">
-          <div className="flex items-center gap-4 xl:hidden">
-            <button className="p-2 -ml-2 hover:bg-slate-100 rounded-xl transition-colors duration-200">
-              <Menu className="text-slate-600" />
-            </button>
-            <span className="font-bold text-xl text-slate-800">MediBook</span>
-          </div>
-
-          <div className="hidden xl:block">
-            <h1 className="text-2xl font-bold text-slate-800">Good Morning, {doctorName} 👋</h1>
+    <DashboardShell role="doctor" activeHref="/doctor/dashboard" showHealthTip={false}>
+        <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl border-b border-slate-100 px-4 sm:px-8 py-4 sm:py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-lg sm:text-2xl font-bold text-slate-800">Good Morning, {doctorName} 👋</h1>
             <p className="text-slate-400 text-sm mt-0.5">
               <span className="inline-flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-[#16BCC8] inline-block"></span>
-                {specialization} &mdash; Here is your daily activity summary.
+                {specialization} — Here is your daily activity summary.
               </span>
             </p>
           </div>
@@ -377,7 +313,23 @@ export default async function DoctorDashboard() {
             </div>
           </div>
         </div>
-      </main>
-    </div>
+
+        <div className="px-4 sm:px-8 pb-8 lg:hidden">
+          <div className="flex items-center gap-3 p-3.5 bg-white rounded-2xl border border-slate-100 shadow-sm">
+            <Link href="/doctor/profile" className="relative shrink-0">
+              <img src={profilePhotoUrl} alt={doctorName} className="w-11 h-11 rounded-xl object-cover border-2 border-white shadow-sm" />
+            </Link>
+            <Link href="/doctor/profile" className="flex-1 min-w-0">
+              <h4 className="text-sm font-bold text-slate-800 truncate">{doctorName}</h4>
+              <p className="text-xs text-[#16BCC8] font-medium truncate">{specialization}</p>
+            </Link>
+            <form action={handleLogout}>
+              <button type="submit" className="p-2 text-slate-400 hover:text-red-500 rounded-xl hover:bg-red-50" aria-label="Log out">
+                <LogOut size={18} />
+              </button>
+            </form>
+          </div>
+        </div>
+    </DashboardShell>
   );
 }

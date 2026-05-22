@@ -40,19 +40,23 @@ let navLinks: { href: string; label: string }[] = [];
 
 if (role === "patient") {
   navLinks = [
-    { href: "/user/dashboard", label: "Home" },
-    { href: "/doctors", label: "Find Doctors" },
+    { href: "/patient/dashboard", label: "Dashboard" },
+    { href: "/patient/findDoctors", label: "Find Doctors" },
     { href: "/patient/appointments", label: "My Appointments" },
+    { href: "/patient/history", label: "Medical History" },
   ];
 } else if (role === "admin") {
   navLinks = [
-    { href: "/admin/dashboard", label: "Admin Home" },
-    { href: "/admin/users", label: "Manage Users" },
+    { href: "/admin/dashboard", label: "Dashboard" },
+    { href: "/admin/doctors", label: "Doctors" },
+    { href: "/admin/users", label: "Users" },
   ];
 } else if (role === "doctor") {
   navLinks = [
-    { href: "/doctor/dashboard", label: "Doctor Home" },
-    { href: "/doctor/patients", label: "My Patients" },
+    { href: "/doctor/dashboard", label: "Dashboard" },
+    { href: "/doctor/schedule", label: "Schedule" },
+    { href: "/doctor/appointments", label: "Appointments" },
+    { href: "/doctor/profile", label: "Profile" },
   ];
 }
 

@@ -24,6 +24,7 @@ import {
   Heart
 } from 'lucide-react';
 import Link from 'next/link';
+import DashboardShell from '@/components/layouts/DashboardShell';
 
 // --- Types ---
 type SlotStatus = 'available' | 'booked' | 'unavailable';
@@ -76,17 +77,6 @@ const initialSchedule: DaySchedule[] = [
 
 // --- Components ---
 
-const SidebarItem = ({ icon: Icon, label, active = false }: { icon: any, label: string, active?: boolean }) => (
-  <div className={`flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all duration-200 group ${
-    active 
-      ? 'bg-[#16BCC8]/8 text-[#16BCC8] font-semibold' 
-      : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
-  }`}>
-    <Icon size={20} className={`transition-colors duration-200 ${active ? 'text-[#16BCC8]' : 'group-hover:text-[#16BCC8]'}`} />
-    <span>{label}</span>
-  </div>
-);
-
 const Toggle = ({ enabled, onChange }: { enabled: boolean; onChange: () => void }) => (
   <button
     onClick={onChange}
@@ -138,44 +128,10 @@ export default function DoctorSchedule() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/50 flex">
-      
-      {/* --- Sidebar --- */}
-      <aside className="fixed left-0 top-0 h-screen w-72 bg-white border-r border-slate-100 hidden lg:flex flex-col z-20 shadow-sm">
-        <div className="p-7">
-          <Link href="/" className="flex items-center gap-2.5 mb-9 group">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#16BCC8] to-[#0ea5a9] shadow-[0_2px_8px_rgba(22,188,200,0.3)] transition-transform duration-300 group-hover:scale-105">
-              <Heart className="h-[18px] w-[18px] text-white" />
-            </div>
-            <span className="text-xl font-bold tracking-tight text-slate-800">MediBook</span>
-          </Link>
-
-          <nav className="space-y-1">
-            <SidebarItem icon={LayoutDashboard} label="Dashboard" />
-            <SidebarItem icon={Calendar} label="My Appointments" />
-            <SidebarItem icon={Clock} label="Schedule" active />
-            <SidebarItem icon={Users} label="Patients" />
-            <SidebarItem icon={Star} label="Reviews" />
-          </nav>
-        </div>
-
-        <div className="mt-auto p-6 border-t border-slate-100">
-          <SidebarItem icon={Settings} label="Settings" />
-        </div>
-      </aside>
-
-      {/* --- Main Content --- */}
-      <main className="flex-1 lg:ml-72">
-        
-        {/* Navbar */}
-        <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl border-b border-slate-100 px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4 lg:hidden">
-            <Menu className="text-slate-500" />
-            <span className="font-bold text-lg text-slate-800">MediBook</span>
-          </div>
-
-          <div className="flex items-center gap-4">
-             <h1 className="text-xl font-bold text-slate-800 hidden md:block">Schedule Management</h1>
+    <DashboardShell role="doctor" activeHref="/doctor/schedule" showHealthTip={false}>
+        <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl border-b border-slate-100 px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+             <h1 className="text-lg sm:text-xl font-bold text-slate-800">Schedule Management</h1>
              <div className="flex items-center bg-slate-100/80 rounded-xl p-1">
                <button className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-white rounded-lg transition-all duration-200"><ChevronLeft size={18} /></button>
                <span className="px-4 text-sm font-semibold text-slate-600">Oct 21 - Oct 27</span>
@@ -196,6 +152,15 @@ export default function DoctorSchedule() {
             <img src="https://i.pravatar.cc/150?u=doctor" alt="Profile" className="w-9 h-9 rounded-xl border-2 border-white shadow-sm" />
           </div>
         </header>
+
+        <div className="flex md:hidden gap-2 px-4 pb-2">
+          <button className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-500 rounded-xl text-sm font-semibold">
+            <RotateCcw size={16} /> Reset
+          </button>
+          <button className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-[#16BCC8] to-[#0ea5a9] text-white rounded-xl text-sm font-semibold">
+            <Save size={16} /> Save
+          </button>
+        </div>
 
         <div className="p-4 md:p-6 max-w-[1600px] mx-auto grid grid-cols-1 xl:grid-cols-4 gap-6">
           
@@ -310,7 +275,7 @@ export default function DoctorSchedule() {
 
                 {/* Calendar Grid */}
                 <div className="flex-1 overflow-x-auto">
-                   <div className="min-w-[800px] h-full flex divide-x divide-slate-100">
+                   <div className="min-w-[560px] sm:min-w-[800px] h-full flex divide-x divide-slate-100">
                       
                       {schedule.map((day, dIdx) => (
                         <div key={day.day} className={`flex-1 flex flex-col min-w-[120px] ${!day.isWorkingDay ? 'bg-slate-50/50' : 'bg-white'}`}>
@@ -390,7 +355,6 @@ export default function DoctorSchedule() {
           </div>
 
         </div>
-      </main>
-    </div>
+    </DashboardShell>
   );
 }

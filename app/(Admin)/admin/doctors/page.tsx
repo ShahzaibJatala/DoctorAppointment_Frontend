@@ -26,6 +26,7 @@ import {
   X,
   ChevronDown
 } from 'lucide-react';
+import DashboardShell from '@/components/layouts/DashboardShell';
 
 // --- Types ---
 type DoctorStatus = 'Active' | 'Pending' | 'Blocked';
@@ -127,24 +128,6 @@ const doctorsData: Doctor[] = [
 
 // --- Components ---
 
-const SidebarItem = ({ icon: Icon, label, active = false, count }: { icon: any, label: string, active?: boolean, count?: number }) => (
-  <div className={`flex items-center justify-between px-4 py-3 rounded-xl cursor-pointer transition-all ${
-    active 
-      ? 'bg-teal-50 text-teal-700 font-semibold' 
-      : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
-  }`}>
-    <div className="flex items-center gap-3">
-      <Icon size={20} className={active ? 'text-teal-600' : ''} />
-      <span>{label}</span>
-    </div>
-    {count !== undefined && (
-      <span className={`text-xs px-2 py-0.5 rounded-full ${active ? 'bg-teal-100 text-teal-700' : 'bg-slate-100 text-slate-500'}`}>
-        {count}
-      </span>
-    )}
-  </div>
-);
-
 const StatusBadge = ({ status }: { status: DoctorStatus }) => {
   const styles = {
     Active: 'bg-green-50 text-green-700 border-green-200',
@@ -189,45 +172,11 @@ export default function AdminDoctors() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 flex">
-      
-      {/* --- Sidebar --- */}
-      <aside className="fixed left-0 top-0 h-screen w-64 bg-white border-r border-slate-200 hidden lg:flex flex-col z-20">
-        <div className="p-6 flex items-center gap-3">
-          <div className="h-8 w-8 bg-teal-600 rounded-lg flex items-center justify-center">
-            <Activity className="text-white h-5 w-5" />
-          </div>
-          <span className="text-xl font-bold text-slate-800 tracking-tight">MediBook</span>
-        </div>
-
-        <nav className="flex-1 px-4 space-y-2 mt-4">
-          <SidebarItem icon={LayoutDashboard} label="Dashboard" />
-          <SidebarItem icon={Stethoscope} label="Doctors" active count={stats.total} />
-          <SidebarItem icon={Users} label="Patients" />
-          <SidebarItem icon={Calendar} label="Appointments" />
-          <SidebarItem icon={Star} label="Reviews" />
-        </nav>
-
-        <div className="p-4 border-t border-slate-100">
-          <SidebarItem icon={Settings} label="Settings" />
-          <div className="mt-4 flex items-center gap-3 px-4 py-2">
-            <img src="https://i.pravatar.cc/150?u=admin" alt="Admin" className="h-9 w-9 rounded-full border border-slate-200" />
-            <div className="flex flex-col">
-              <span className="text-sm font-semibold text-slate-700">Admin User</span>
-              <span className="text-xs text-slate-500">Super Admin</span>
-            </div>
-          </div>
-        </div>
-      </aside>
-
-      {/* --- Main Content --- */}
-      <main className="flex-1 lg:ml-64 relative">
-        
-        {/* Navbar */}
-        <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-slate-200 px-6 py-4 flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-slate-800">Doctors Management</h1>
-          <div className="flex items-center gap-4">
-            <div className="hidden md:flex items-center bg-slate-100 rounded-lg px-4 py-2 w-64 border border-transparent focus-within:border-teal-500 transition-all">
+    <DashboardShell role="admin" activeHref="/admin/doctors" sidebarWidth="narrow" showHealthTip={false}>
+        <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-slate-200 px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Doctors Management</h1>
+          <div className="flex items-center gap-4 w-full sm:w-auto">
+            <div className="flex flex-1 md:flex-none items-center bg-slate-100 rounded-lg px-4 py-2 md:w-64 border border-transparent focus-within:border-teal-500 transition-all">
               <Search className="text-slate-400 w-4 h-4" />
               <input 
                 type="text" 
@@ -308,7 +257,7 @@ export default function AdminDoctors() {
 
           {/* Doctors Table */}
           <div className="bg-white border border-slate-100 rounded-xl shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-left">
                 <thead className="bg-slate-50 border-b border-slate-100">
                   <tr>
@@ -391,10 +340,41 @@ export default function AdminDoctors() {
                 </tbody>
               </table>
             </div>
+
+            {/* Mobile card view */}
+            <div className="md:hidden divide-y divide-slate-100">
+              {filteredDoctors.length === 0 ? (
+                <p className="p-8 text-center text-slate-500 text-sm">No doctors found matching your criteria.</p>
+              ) : filteredDoctors.map((doc) => (
+                <div key={doc.id} className="p-4 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <img src={doc.avatar} alt="" className="w-12 h-12 rounded-full object-cover border border-slate-100" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-slate-800 truncate">{doc.name}</p>
+                      <p className="text-xs text-slate-500">{doc.specialty}</p>
+                    </div>
+                    <StatusBadge status={doc.status} />
+                  </div>
+                  <p className="text-xs text-slate-500 truncate">{doc.email}</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setSelectedDoctor(doc)}
+                      className="flex-1 py-2 bg-slate-50 text-slate-600 text-sm font-medium rounded-lg border border-slate-200"
+                    >
+                      View Details
+                    </button>
+                    {doc.status === 'Pending' && (
+                      <button className="px-3 py-2 text-green-600 bg-green-50 rounded-lg" title="Approve">
+                        <CheckCircle size={18} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
         </div>
-      </main>
 
       {/* --- Quick View Modal --- */}
       {selectedDoctor && (
@@ -491,6 +471,6 @@ export default function AdminDoctors() {
         </div>
       )}
 
-    </div>
+    </DashboardShell>
   );
 }
