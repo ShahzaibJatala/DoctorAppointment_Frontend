@@ -2,13 +2,9 @@
 
 import React, { useState } from 'react';
 import {
-  LayoutDashboard,
   Search,
   Calendar,
   FileText,
-  ClipboardList,
-  Settings,
-  Menu,
   Bell,
   Download,
   Share2,
@@ -20,12 +16,9 @@ import {
   ChevronDown,
   ShieldAlert,
   X,
-  Heart,
-  Star,
   ArrowRight,
   Video
 } from 'lucide-react';
-import Link from 'next/link';
 import DashboardShell from '@/components/layouts/DashboardShell';
 
 // --- Types ---
@@ -130,24 +123,6 @@ export default function MedicalHistory() {
   };
 
   return (
-
-    <div className="min-h-screen bg-slate-50/50 flex">
-      
-      {/* --- Sidebar --- */}
-    
-
-      {/* --- Main Content --- */}
-      <main className="flex-1 lg:ml-72">
-        
-        {/* Navbar */}
-        <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl border-b border-slate-100 px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4 lg:hidden">
-            <Menu className="text-slate-500" />
-            <span className="font-bold text-lg text-slate-800">MediBook</span>
-          </div>
-
-          <h1 className="text-xl font-bold text-slate-800 hidden lg:block">Medical History</h1>
-
     <DashboardShell role="patient" activeHref="/patient/history">
         <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl border-b border-slate-100 px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <h1 className="text-lg sm:text-xl font-bold text-slate-800">Medical History</h1>

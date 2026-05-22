@@ -10,22 +10,14 @@ import {
   Filter,
   MoreVertical,
   CalendarCheck,
-  LayoutDashboard,
-  FileText,
-  ClipboardList,
-  Settings,
-  LogOut,
   Bell,
-  Menu,
   ChevronRight,
   Plus,
   X,
   CheckCircle2,
   AlertCircle,
-  Heart,
   ArrowRight
 } from 'lucide-react';
-import Link from 'next/link';
 import DashboardShell from '@/components/layouts/DashboardShell';
 
 // --- Types ---
@@ -161,24 +153,6 @@ export default function MyAppointments() {
   });
 
   return (
-
-    <div className="min-h-screen bg-slate-50/50 flex">
-      
-      {/* --- Sidebar (Hidden on Mobile) --- */}
-     
-
-      {/* --- Main Content --- */}
-      <main className="flex-1 lg:ml-72">
-        
-        {/* Top Navbar */}
-        <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl border-b border-slate-100 px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4 lg:hidden">
-            <Menu className="text-slate-500" />
-            <span className="font-bold text-lg text-slate-800">MediBook</span>
-          </div>
-
-          <h1 className="text-xl font-bold text-slate-800 hidden lg:block">My Appointments</h1>
-
     <DashboardShell role="patient" activeHref="/patient/appointments">
         <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl border-b border-slate-100 px-4 sm:px-6 py-4 flex items-center justify-between">
           <h1 className="text-lg sm:text-xl font-bold text-slate-800">My Appointments</h1>
@@ -333,8 +307,5 @@ export default function MyAppointments() {
 
         </div>
     </DashboardShell>
-    </header>
-    </main>
-    </div>
   );
 }
