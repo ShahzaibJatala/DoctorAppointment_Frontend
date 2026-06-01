@@ -287,7 +287,7 @@ export default function MedicalHistory() {
                         
                         {/* Notes */}
                         <div>
-                          <h4 className="text-xs font-bold uppercase text-slate-400 mb-2 tracking-wider">Doctor's Notes</h4>
+                          <h4 className="text-xs font-bold uppercase text-slate-400 mb-2 tracking-wider">Doctor&apos;s Notes</h4>
                           <p className="text-sm text-slate-600 bg-slate-50/80 p-4 rounded-xl leading-relaxed border border-slate-100">
                             {record.notes}
                           </p>
