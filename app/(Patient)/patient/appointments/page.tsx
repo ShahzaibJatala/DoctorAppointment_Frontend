@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Calendar,
   Clock,
@@ -19,9 +19,10 @@ import {
   ArrowRight
 } from 'lucide-react';
 import DashboardShell from '@/components/layouts/DashboardShell';
+import { getToken } from '@/app/actions/token';
 
 // --- Types ---
-type AppointmentStatus = 'Confirmed' | 'Pending' | 'Completed' | 'Cancelled';
+type AppointmentStatus = 'Confirmed' | 'Pending' | 'Completed' | 'Cancelled' | 'checked-in' | 'in-progress' | 'Upcoming';
 type AppointmentType = 'Video' | 'In-Clinic';
 
 interface Appointment {
@@ -36,65 +37,16 @@ interface Appointment {
   location?: string; // Optional for In-Clinic
 }
 
-// --- Mock Data ---
-const allAppointments: Appointment[] = [
-  {
-    id: '1',
-    doctorName: 'Dr. Sarah Wilson',
-    specialty: 'Cardiologist',
-    avatar: 'https://i.pravatar.cc/150?u=30',
-    date: 'Oct 26, 2024',
-    time: '10:00 AM',
-    type: 'Video',
-    status: 'Confirmed'
-  },
-  {
-    id: '2',
-    doctorName: 'Dr. James Lee',
-    specialty: 'Dermatologist',
-    avatar: 'https://i.pravatar.cc/150?u=31',
-    date: 'Oct 29, 2024',
-    time: '02:30 PM',
-    type: 'In-Clinic',
-    status: 'Pending',
-    location: 'MediBook Center, Room 302'
-  },
-  {
-    id: '3',
-    doctorName: 'Dr. Emma Chen',
-    specialty: 'General Physician',
-    avatar: 'https://i.pravatar.cc/150?u=32',
-    date: 'Oct 15, 2024',
-    time: '09:00 AM',
-    type: 'Video',
-    status: 'Completed'
-  },
-  {
-    id: '4',
-    doctorName: 'Dr. Michael Ross',
-    specialty: 'Neurologist',
-    avatar: 'https://i.pravatar.cc/150?u=33',
-    date: 'Sep 20, 2024',
-    time: '11:00 AM',
-    type: 'In-Clinic',
-    status: 'Cancelled',
-    location: 'City Hospital, Wing A'
-  },
-  {
-    id: '5',
-    doctorName: 'Dr. Linda Kim',
-    specialty: 'Pediatrician',
-    avatar: 'https://i.pravatar.cc/150?u=34',
-    date: 'Nov 02, 2024',
-    time: '04:00 PM',
-    type: 'Video',
-    status: 'Confirmed'
-  }
-];
-
 // --- Components ---
 
 const StatusBadge = ({ status }: { status: AppointmentStatus }) => {
+  const statusLower = status?.toLowerCase();
+  const normalizedStatus = 
+    statusLower === 'upcoming' || statusLower === 'pending' ? 'Pending' :
+    statusLower === 'checked-in' || statusLower === 'in-progress' || statusLower === 'confirmed' ? 'Confirmed' :
+    statusLower === 'completed' ? 'Completed' :
+    'Cancelled';
+
   const styles = {
     Confirmed: 'bg-[#20AC6B]/10 text-[#20AC6B] border-[#20AC6B]/20',
     Pending: 'bg-amber-50 text-amber-600 border-amber-200/50',
@@ -109,10 +61,10 @@ const StatusBadge = ({ status }: { status: AppointmentStatus }) => {
     Cancelled: X,
   };
 
-  const Icon = icons[status];
+  const Icon = icons[normalizedStatus as 'Confirmed' | 'Pending' | 'Completed' | 'Cancelled'];
 
   return (
-    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border ${styles[status]}`}>
+    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border ${styles[normalizedStatus as 'Confirmed' | 'Pending' | 'Completed' | 'Cancelled']}`}>
       <Icon size={12} />
       {status}
     </span>
@@ -138,13 +90,123 @@ const EmptyState = () => (
 export default function MyAppointments() {
   const [activeTab, setActiveTab] = useState<'Upcoming' | 'Completed' | 'Cancelled'>('Upcoming');
   const [searchQuery, setSearchQuery] = useState('');
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchAppointments = async () => {
+    try {
+      setIsLoading(true);
+      const token = await getToken();
+      if (!token) return;
+      const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL;
+      const res = await fetch(`${serverUrl}/patient/my-appointments`, {
+        headers: {
+          'Authorization': `Bearer ${token.replace(/"/g, '').trim()}`,
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const mapped = data.map((item: any) => ({
+          id: item.id || item._id,
+          doctorName: item.doctorName,
+          specialty: item.specialty,
+          avatar: item.avatar,
+          date: new Date(item.date).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }),
+          time: new Date(item.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          type: item.type === 'Online' ? 'Video' : 'In-Clinic',
+          status: item.status,
+          location: item.location || 'Clinic Cabin',
+        }));
+        setAppointments(mapped);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    async function verifyPayments() {
+      const params = new URLSearchParams(window.location.search);
+      const statusParam = params.get('status');
+      const sessionId = params.get('session_id');
+      const mockJc = params.get('mock_jc');
+      const mockEp = params.get('mock_ep');
+
+      if (statusParam === 'success') {
+        try {
+          const token = await getToken();
+          if (!token) return;
+          const cleanToken = token.replace(/"/g, '').trim();
+          const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL;
+
+          if (sessionId) {
+            // Verify Stripe Session
+            const res = await fetch(`${serverUrl}/payment/verify-checkout-session/${sessionId}`, {
+              headers: {
+                'Authorization': `Bearer ${cleanToken}`,
+              }
+            });
+            if (res.ok) {
+              alert('Stripe card payment verified and slot booked successfully!');
+              window.history.replaceState({}, document.title, window.location.pathname);
+              await fetchAppointments();
+            } else {
+              const errData = await res.json();
+              alert(`Payment verification failed: ${errData.error || 'Unknown error'}`);
+            }
+          } else if (mockJc) {
+            // Verify Mock JazzCash
+            const res = await fetch(`${serverUrl}/payment/jazzcash/verify-mock`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${cleanToken}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ description: decodeURIComponent(mockJc) })
+            });
+            if (res.ok) {
+              alert('JazzCash payment completed and slot booked successfully!');
+              window.history.replaceState({}, document.title, window.location.pathname);
+              await fetchAppointments();
+            }
+          } else if (mockEp) {
+            // Verify Mock EasyPaisa
+            const res = await fetch(`${serverUrl}/payment/easypaisa/verify-mock`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${cleanToken}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ description: decodeURIComponent(mockEp) })
+            });
+            if (res.ok) {
+              alert('EasyPaisa payment completed and slot booked successfully!');
+              window.history.replaceState({}, document.title, window.location.pathname);
+              await fetchAppointments();
+            }
+          }
+        } catch (err) {
+          console.error('Payment verification error:', err);
+        }
+      } else if (statusParam === 'cancelled') {
+        alert('Payment was cancelled or failed.');
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    }
+
+    verifyPayments();
+    fetchAppointments();
+  }, []);
 
   // Filter Logic
-  const filteredAppointments = allAppointments.filter(apt => {
+  const filteredAppointments = appointments.filter(apt => {
+    const statusLower = apt.status?.toLowerCase();
     const matchesTab = 
-      activeTab === 'Upcoming' ? (apt.status === 'Confirmed' || apt.status === 'Pending') :
-      activeTab === 'Completed' ? apt.status === 'Completed' :
-      apt.status === 'Cancelled';
+      activeTab === 'Upcoming' ? (statusLower === 'confirmed' || statusLower === 'pending' || statusLower === 'checked-in' || statusLower === 'in-progress' || statusLower === 'upcoming') :
+      activeTab === 'Completed' ? statusLower === 'completed' :
+      statusLower === 'cancelled';
     
     const matchesSearch = apt.doctorName.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           apt.specialty.toLowerCase().includes(searchQuery.toLowerCase());
@@ -228,7 +290,12 @@ export default function MyAppointments() {
 
           {/* Appointments List */}
           <div className="space-y-4">
-            {filteredAppointments.length === 0 ? (
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-slate-100 shadow-sm">
+                <div className="h-8 w-8 border-2 border-teal-600/30 border-t-teal-600 rounded-full animate-spin mb-4" />
+                <p className="text-slate-500 font-medium text-sm">Loading appointments...</p>
+              </div>
+            ) : filteredAppointments.length === 0 ? (
               <EmptyState />
             ) : (
               filteredAppointments.map((apt, index) => (

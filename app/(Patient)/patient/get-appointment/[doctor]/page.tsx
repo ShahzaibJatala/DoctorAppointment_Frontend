@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Calendar, Clock, MapPin, Video, CreditCard,
   ChevronRight, CheckCircle2, ArrowLeft, Check,
@@ -144,25 +144,100 @@ export default function GetAppointmentPage() {
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
 
   // Payment state
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'cash'>('card');
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'cash' | 'easypaisa' | 'jazzcash'>('card');
   const [cardName, setCardName] = useState('');
   const [cardNumber, setCardNumber] = useState('');
   const [cardExpiry, setCardExpiry] = useState('');
   const [cardCVV, setCardCVV] = useState('');
+  const [mobileWalletNumber, setMobileWalletNumber] = useState('');
 
   // Status
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [walletStage, setWalletStage] = useState<'idle' | 'sending' | 'authorizing'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
+  const [doctorProfile, setDoctorProfile] = useState<any>(null);
+
+  useEffect(() => {
+    async function fetchDoctorDetails() {
+      try {
+        const token = await getToken();
+        if (!token) return;
+        const res = await axios.get(`${serverUrl}/patient/allDoctors`, {
+          headers: {
+            Authorization: `Bearer ${token.replace(/"/g, '').trim()}`,
+          }
+        });
+        const doc = res.data.find((d: any) => d._id === doctorId);
+        if (doc) {
+          setDoctorProfile(doc);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    fetchDoctorDetails();
+  }, [doctorId]);
 
   const days = useMemo(() => getNextSevenDays(), []);
   const fee = bookingType === 'Clinic' ? consultationFee : Math.round(consultationFee * 0.75);
 
-  const morning = TIME_SLOTS.filter(s => s.period === 'Morning');
-  const afternoon = TIME_SLOTS.filter(s => s.period === 'Afternoon');
-  const evening = TIME_SLOTS.filter(s => s.period === 'Evening');
+  const isDayAvailableForDoctor = (date: Date) => {
+    if (!doctorProfile) return true;
+    const dayNamesFull = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const currentDayName = dayNamesFull[date.getDay()];
+    const slotsForDay = doctorProfile.availability?.filter(
+      (slot: any) => slot.day === currentDayName
+    ) || [];
+    if (slotsForDay.length > 0) {
+      return slotsForDay.some((slot: any) => slot.isAvailable);
+    }
+    const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+    return !isWeekend;
+  };
+
+  const getFilteredTimeSlots = (date: Date) => {
+    if (!doctorProfile) return TIME_SLOTS;
+    const dayNamesFull = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const currentDayName = dayNamesFull[date.getDay()];
+    const slotsForDay = doctorProfile.availability?.filter(
+      (slot: any) => slot.day === currentDayName && slot.isAvailable
+    ) || [];
+    if (slotsForDay.length === 0) {
+      const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+      return isWeekend ? [] : TIME_SLOTS;
+    }
+    const parseTime = (str: string) => {
+      const [timePart, period] = str.split(' ');
+      let [hours, minutes] = timePart.split(':').map(Number);
+      if (period === 'PM' && hours !== 12) hours += 12;
+      if (period === 'AM' && hours === 12) hours = 0;
+      return hours + minutes / 60;
+    };
+    const parseHHMM = (str: string) => {
+      const [hours, minutes] = str.split(':').map(Number);
+      return hours + minutes / 60;
+    };
+    return TIME_SLOTS.filter(slot => {
+      const slotTime = parseTime(slot.time);
+      return slotsForDay.some((avail: any) => {
+        const start = parseHHMM(avail.startTime);
+        const end = parseHHMM(avail.endTime);
+        return slotTime >= start && slotTime <= end;
+      });
+    });
+  };
+
+  const filteredSlots = useMemo(() => {
+    return getFilteredTimeSlots(days[selectedDayIdx].date);
+  }, [doctorProfile, selectedDayIdx, days]);
+
+  const morning = filteredSlots.filter(s => s.period === 'Morning');
+  const afternoon = filteredSlots.filter(s => s.period === 'Afternoon');
+  const evening = filteredSlots.filter(s => s.period === 'Evening');
 
   const cardValid = cardName.trim().length > 2 && cardNumber.length >= 19 && cardExpiry.length === 5 && cardCVV.length === 3;
-  const canPay = paymentMethod === 'cash' || cardValid;
+  const walletValid = mobileWalletNumber.replace(/\D/g, '').length >= 10;
+  const canPay = paymentMethod === 'cash' || cardValid || ((paymentMethod === 'easypaisa' || paymentMethod === 'jazzcash') && walletValid);
 
   const handleConfirm = async () => {
     setIsSubmitting(true);
@@ -172,50 +247,86 @@ export default function GetAppointmentPage() {
       const token = await getToken();
       if (!token) { 
         setErrorMessage('Please log in to book an appointment.'); 
+        setIsSubmitting(false);
         return; 
       }
 
       const startDateTime = parseSlotToDateTime(days[selectedDayIdx].date, selectedTime!);
       const endDateTime = new Date(startDateTime.getTime() + 30 * 60000);
 
-      // --- STEP 1: INITIALIZE PAYMENT ---
-      // Notice there is no inner try/catch. If this fails, it jumps straight to the bottom!
-      const stripeResponse = await axios.post(
-        `${serverUrl}/payment/create-checkout-session`,
-        { productId: '123' }, 
-        { withCredentials: true } 
-      );
-
-      // --- STEP 2: REDIRECT ---
-      if (stripeResponse.data.url) {
-        window.location.href = stripeResponse.data.url;
-        // CRITICAL: Return immediately. This stops the function so the addPatient API 
-        // doesn't fire while the browser is navigating to Stripe.
-        return; 
+      // Mobile wallet simulation animation
+      if (paymentMethod === 'easypaisa' || paymentMethod === 'jazzcash') {
+        setWalletStage('sending');
+        await new Promise(r => setTimeout(r, 2000));
+        setWalletStage('authorizing');
+        await new Promise(r => setTimeout(r, 2500));
       }
 
-      // --- STEP 3: ADD PATIENT (Fallback for non-Stripe flows) ---
-      // This will ONLY run if the Stripe URL wasn't returned, but no error was thrown.
-      await axios.post(`${serverUrl}/doctor/addPatient`, {
-        doctorId,
-        startTime: startDateTime.toISOString(),
-        endTime: endDateTime.toISOString(),
-        appointmentType: bookingType,
-        paymentMethod,
-      }, {
-        headers: {
-          Authorization: `Bearer ${token.replace(/"/g, '').trim()}`,
-          'Content-Type': 'application/json',
-        },
-        withCredentials: true,
-      });
+      // --- STEP 1: INITIALIZE INTEGRATED GATEWAYS (Stripe, JazzCash, EasyPaisa) ---
+      if (paymentMethod === 'card' || paymentMethod === 'easypaisa' || paymentMethod === 'jazzcash') {
+        const endpoint = paymentMethod === 'card' 
+          ? 'create-checkout-session' 
+          : `${paymentMethod}/initiate`;
+
+        const initResponse = await axios.post(
+          `${serverUrl}/payment/${endpoint}`,
+          {
+            doctorId,
+            startTime: startDateTime.toISOString(),
+            endTime: endDateTime.toISOString(),
+            appointmentType: bookingType,
+            consultationFee: fee
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${token.replace(/"/g, '').trim()}`,
+            },
+            withCredentials: true
+          }
+        );
+
+        if (initResponse.data.url) {
+          if (initResponse.data.fields) {
+            // Real Hosted Form post redirect
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = initResponse.data.url;
+            Object.keys(initResponse.data.fields).forEach((key) => {
+              const input = document.createElement('input');
+              input.type = 'hidden';
+              input.name = key;
+              input.value = initResponse.data.fields[key];
+              form.appendChild(input);
+            });
+            document.body.appendChild(form);
+            form.submit();
+          } else {
+            // Mock or Direct redirect fallback url
+            window.location.href = initResponse.data.url;
+          }
+          return;
+        }
+      } else {
+        // --- STEP 2: DIRECT BOOKING (Cash On Visit) ---
+        await axios.post(`${serverUrl}/doctor/addPatient`, {
+          doctorId,
+          startTime: startDateTime.toISOString(),
+          endTime: endDateTime.toISOString(),
+          appointmentType: bookingType,
+          paymentMethod,
+          mobileWalletNumber,
+        }, {
+          headers: {
+            Authorization: `Bearer ${token.replace(/"/g, '').trim()}`,
+            'Content-Type': 'application/json',
+          },
+          withCredentials: true,
+        });
+      }
 
       setStep('confirmed');
     } catch (err: any) {
-      // If Stripe or the database fails, it stops execution and lands right here.
       console.error('Submission error:', err);
-      
-      // We check for 'error' first, which is what your NestJS Stripe controller sends back
       setErrorMessage(
         err.response?.data?.error || 
         err.response?.data?.message || 
@@ -223,12 +334,14 @@ export default function GetAppointmentPage() {
       );
     } finally {
       setIsSubmitting(false);
+      setWalletStage('idle');
     }
   };
 
   const handleReset = () => {
     setStep('datetime'); setSelectedTime(null); setSelectedDayIdx(0);
     setCardName(''); setCardNumber(''); setCardExpiry(''); setCardCVV('');
+    setMobileWalletNumber('');
     setErrorMessage('');
   };
 
@@ -356,21 +469,27 @@ export default function GetAppointmentPage() {
                       <span className="ml-auto text-xs text-slate-400 font-normal">Next 7 days</span>
                     </h3>
                     <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide sm:grid sm:grid-cols-7 sm:overflow-visible sm:pb-0 sm:mx-0 sm:px-0">
-                      {days.map((d, i) => (
-                        <button
-                          key={i}
-                          onClick={() => { setSelectedDayIdx(i); setSelectedTime(null); }}
-                          className={`flex flex-col items-center py-3 px-2 sm:px-0 min-w-[3.25rem] sm:min-w-0 shrink-0 sm:shrink rounded-xl border-2 transition-all ${
-                            selectedDayIdx === i
-                              ? 'bg-teal-600 border-teal-600 text-white shadow-md'
-                              : 'bg-white border-slate-200 text-slate-600 hover:border-teal-300 hover:bg-teal-50/50'
-                          }`}
-                        >
-                          <span className="text-[9px] font-bold uppercase opacity-70">{d.label.slice(0, 3)}</span>
-                          <span className="text-lg font-extrabold leading-tight">{d.display}</span>
-                          <span className="text-[9px] opacity-60">{d.month}</span>
-                        </button>
-                      ))}
+                      {days.map((d, i) => {
+                        const isAvailable = isDayAvailableForDoctor(d.date);
+                        return (
+                          <button
+                            key={i}
+                            disabled={!isAvailable}
+                            onClick={() => { setSelectedDayIdx(i); setSelectedTime(null); }}
+                            className={`flex flex-col items-center py-3 px-2 sm:px-0 min-w-[3.25rem] sm:min-w-0 shrink-0 sm:shrink rounded-xl border-2 transition-all ${
+                              selectedDayIdx === i
+                                ? 'bg-teal-600 border-teal-600 text-white shadow-md'
+                                : !isAvailable
+                                ? 'bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed opacity-50'
+                                : 'bg-white border-slate-200 text-slate-600 hover:border-teal-300 hover:bg-teal-50/50'
+                            }`}
+                          >
+                            <span className="text-[9px] font-bold uppercase opacity-70">{d.label.slice(0, 3)}</span>
+                            <span className="text-lg font-extrabold leading-tight">{d.display}</span>
+                            <span className="text-[9px] opacity-60">{d.month}</span>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -436,21 +555,53 @@ export default function GetAppointmentPage() {
                     </div>
                   </div>
 
+                  {/* Wallet Processing Overlay */}
+                  {walletStage !== 'idle' && (
+                    <div className="absolute inset-0 bg-white/95 backdrop-blur-sm z-30 flex flex-col items-center justify-center p-6 text-center animate-fade-in">
+                      <div className="relative w-24 h-24 mb-6">
+                        <div className="absolute inset-0 rounded-full border-4 border-slate-100 border-t-teal-600 animate-spin"></div>
+                        <div className="absolute inset-2 bg-slate-50 rounded-full flex items-center justify-center text-3xl">
+                          {paymentMethod === 'easypaisa' ? '📱' : '📲'}
+                        </div>
+                      </div>
+                      <h3 className="font-extrabold text-xl text-slate-800 mb-2">
+                        {walletStage === 'sending' ? 'Initiating Wallet Transaction' : 'Awaiting Authorization'}
+                      </h3>
+                      <p className="text-slate-500 text-sm max-w-xs leading-relaxed">
+                        {walletStage === 'sending' 
+                          ? `Sending transaction request to mobile account ${mobileWalletNumber}...`
+                          : `Please check your phone screen. Enter your secret PIN to authorize the transaction of $${fee}.`
+                        }
+                      </p>
+                      <div className="mt-8 flex gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-teal-600 animate-ping"></span>
+                        <span className="w-2.5 h-2.5 rounded-full bg-teal-600 animate-pulse delay-75"></span>
+                        <span className="w-2.5 h-2.5 rounded-full bg-teal-600 animate-pulse delay-150"></span>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Payment method */}
                   <h3 className="font-bold text-slate-800 text-sm mb-3">Payment Method</h3>
-                  <div className="grid grid-cols-2 gap-3 mb-5">
-                    {(['card', 'cash'] as const).map(method => (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+                    {[
+                      { id: 'card', name: 'Pay by Card', icon: <CreditCard size={20} /> },
+                      { id: 'cash', name: 'Pay at Clinic', icon: <span className="text-xl">💵</span> },
+                      { id: 'easypaisa', name: 'EasyPaisa', icon: <span className="text-lg font-extrabold text-emerald-600">EP</span> },
+                      { id: 'jazzcash', name: 'JazzCash', icon: <span className="text-lg font-extrabold text-amber-600">JC</span> },
+                    ].map(method => (
                       <button
-                        key={method}
-                        onClick={() => setPaymentMethod(method)}
-                        className={`flex flex-col items-center justify-center gap-2 py-4 px-3 rounded-xl border-2 text-sm font-bold transition-all ${
-                          paymentMethod === method
-                            ? 'border-teal-500 bg-teal-50 text-teal-700'
+                        key={method.id}
+                        type="button"
+                        onClick={() => { setPaymentMethod(method.id as any); setErrorMessage(''); }}
+                        className={`flex flex-col items-center justify-center gap-2 py-3 px-2 rounded-xl border-2 text-xs font-bold transition-all ${
+                          paymentMethod === method.id
+                            ? 'border-teal-500 bg-teal-50 text-teal-700 shadow-sm'
                             : 'border-slate-200 text-slate-500 hover:border-slate-300'
                         }`}
                       >
-                        {method === 'card' ? <CreditCard size={22} /> : <span className="text-2xl">💵</span>}
-                        {method === 'card' ? 'Pay by Card' : 'Pay at Clinic'}
+                        {method.icon}
+                        <span>{method.name}</span>
                       </button>
                     ))}
                   </div>
@@ -496,6 +647,40 @@ export default function GetAppointmentPage() {
                             className="w-full px-4 py-3 border border-slate-200 bg-white rounded-xl text-sm font-mono focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-50 transition-all"
                           />
                         </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Wallet form */}
+                  {(paymentMethod === 'easypaisa' || paymentMethod === 'jazzcash') && (
+                    <div className={`space-y-4 mb-5 p-5 rounded-2xl border transition-all ${
+                      paymentMethod === 'easypaisa' ? 'bg-emerald-50/50 border-emerald-200' : 'bg-amber-50/50 border-amber-200'
+                    }`}>
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white shrink-0 shadow-sm ${
+                          paymentMethod === 'easypaisa' ? 'bg-emerald-500' : 'bg-amber-500'
+                        }`}>
+                          {paymentMethod === 'easypaisa' ? 'EP' : 'JC'}
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-slate-800 text-sm">
+                            {paymentMethod === 'easypaisa' ? 'EasyPaisa Account' : 'JazzCash Account'}
+                          </h4>
+                          <p className="text-xs text-slate-400">Pay directly from your mobile wallet account</p>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Mobile Account Number</label>
+                        <input
+                          value={mobileWalletNumber}
+                          onChange={e => setMobileWalletNumber(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                          placeholder="e.g. 03001234567"
+                          className="w-full px-4 py-3 border border-slate-200 bg-white rounded-xl text-sm font-mono tracking-widest focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-50 transition-all"
+                        />
+                        <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">
+                          * Please ensure your phone is unlocked. You will receive a direct prompt on your mobile to enter your PIN and approve the payment of ${fee}.
+                        </p>
                       </div>
                     </div>
                   )}

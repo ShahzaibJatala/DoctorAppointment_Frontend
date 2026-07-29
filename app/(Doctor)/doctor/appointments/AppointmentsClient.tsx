@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import {
   Calendar, Search, Clock, MapPin, Video,
   CheckCircle, XCircle, LayoutDashboard, Users, Star, Settings,
-  Menu, FileText, X, Loader2, Pill
+  Menu, FileText, X, Loader2, Pill, UploadCloud, Download
 } from 'lucide-react';
 import axios from "axios";
 import { getToken } from "@/app/actions/token";
@@ -18,6 +18,8 @@ type AppointmentType = 'In-Clinic' | 'Video';
 
 interface Appointment {
   id: string;
+  patientUserId: string;
+  patientDocId?: string;
   patientName: string;
   age: number | string;
   gender: string;
@@ -30,6 +32,7 @@ interface Appointment {
   notes?: string;
   phone?: string;
   prescription?: string;
+  medicalRecords?: any[];
 }
 
 // --- Props ---
@@ -108,37 +111,49 @@ export default function AppointmentsClient({ specialization }: AppointmentsClien
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [prescriptionText, setPrescriptionText] = useState('');
   const [reasonText, setReasonText] = useState(''); // ← editable reason field
+  const [uploadedReports, setUploadedReports] = useState<string[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
 
   const dispatch = useAppDispatch();
   const reduxStatus = useAppSelector((state) => state.appointment.status);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setIsLoading(true);
-        const token = await getToken();
+  const fetchAppointments = async () => {
+    try {
+      setIsLoading(true);
+      const token = await getToken();
 
-        if (!token) {
-          console.error("No token found, skipping fetch.");
-          setIsLoading(false);
-          return;
-        }
+      if (!token) {
+        console.error("No token found, skipping fetch.");
+        setIsLoading(false);
+        return;
+      }
 
-        const cleanToken = token.replace(/"/g, '').trim();
+      const cleanToken = token.replace(/"/g, '').trim();
 
-        const response = await axios.get(`${process.env.NEXT_PUBLIC_SERVER_URL}/doctor/getPatients`, {
-          headers: {
-            'Authorization': `Bearer ${cleanToken}`,
-            'Content-Type': 'application/json',
-          },
-          withCredentials: true,
-        });
+      const response = await axios.get(`${process.env.NEXT_PUBLIC_SERVER_URL}/doctor/getPatients`, {
+        headers: {
+          'Authorization': `Bearer ${cleanToken}`,
+          'Content-Type': 'application/json',
+        },
+        withCredentials: true,
+      });
 
-        if (!response.data) throw new Error('No data received from server');
+      if (!response.data) throw new Error('No data received from server');
 
-        // Map Backend Data — use specialization as fallback reason when reasonForVisit is empty
-        const mappedData: Appointment[] = response.data.map((patient: any) => ({
-          id: patient._id,
+      const mappedData: Appointment[] = response.data.map((patient: any) => {
+        const statusLower = patient.status?.toLowerCase();
+        const normalizedStatus: AppointmentStatus = 
+          statusLower === 'confirmed' || statusLower === 'upcoming' || statusLower === 'pending' || statusLower === 'checked-in' || statusLower === 'in-progress'
+            ? 'Upcoming' 
+            : statusLower === 'completed'
+            ? 'Completed'
+            : statusLower === 'cancelled'
+            ? 'Cancelled'
+            : 'Upcoming';
+
+        return {
+          id: patient.appointmentId || patient._id,
+          patientUserId: patient._id,
           patientName: patient.name || patient.email.split('@')[0],
           age: patient.age || 'N/A',
           gender: patient.gender || 'Unspecified',
@@ -146,49 +161,113 @@ export default function AppointmentsClient({ specialization }: AppointmentsClien
           date: formatDate(patient.startTime),
           time: `${formatTime(patient.startTime)} - ${formatTime(patient.endTime)}`,
           type: 'In-Clinic',
-          // ← KEY: use reasonForVisit from backend, fallback to doctor's specialization
           reason: patient.reasonForVisit || specialization,
-          status: patient.appointmentStatus || 'Upcoming',
+          status: normalizedStatus,
           phone: patient.phone || 'No phone provided',
-          prescription: patient.prescription || ''
-        }));
+          prescription: patient.prescription || '',
+          medicalRecords: patient.medicalRecords || [],
+          patientDocId: patient.patientDocId,
+        };
+      });
 
-        // Merge any locally saved status/prescription overrides on top of backend data
-        const overrides = getOverrides();
-        const mergedData = mappedData.map((apt) =>
-          overrides[apt.id]
-            ? { ...apt, ...overrides[apt.id] }
-            : apt
-        );
+      // Merge any locally saved status/prescription overrides on top of backend data
+      const overrides = getOverrides();
+      const mergedData = mappedData.map((apt) =>
+        overrides[apt.id]
+          ? { ...apt, ...overrides[apt.id] }
+          : apt
+      );
 
-        setAppointments(mergedData);
+      setAppointments(mergedData);
 
-      } catch (error) {
-        console.error('Error in useEffect:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    } catch (error) {
+      console.error('Error fetching appointments:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    fetchData();
+  useEffect(() => {
+    fetchAppointments();
   }, [specialization]);
+
+  const handleUploadReport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setIsUploading(true);
+
+    try {
+      const token = await getToken();
+      if (!token) throw new Error("No token found");
+      const cleanToken = token.replace(/"/g, '').trim();
+
+      for (let i = 0; i < files.length; i++) {
+        const formData = new FormData();
+        formData.append('file', files[i]);
+
+        const res = await axios.post(
+          `${process.env.NEXT_PUBLIC_SERVER_URL}/patient/upload-report-file`,
+          formData,
+          {
+            headers: {
+              'Authorization': `Bearer ${cleanToken}`,
+              'Content-Type': 'multipart/form-data',
+            }
+          }
+        );
+        if (res.data?.url) {
+          setUploadedReports(prev => [...prev, res.data.url]);
+        }
+      }
+      alert('Report files uploaded and attached successfully!');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to upload PDF reports.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   // Sync modal fields when modal opens
   useEffect(() => {
     if (selectedAppointment) {
-      setPrescriptionText(selectedAppointment.prescription || '');
-      setReasonText(selectedAppointment.reason || '');   // ← sync reason
-      dispatch(setReduxStatus(selectedAppointment.status));
+      // Find latest mapped record details in state to display up-to-date data
+      const currentApt = appointments.find(a => a.id === selectedAppointment.id) || selectedAppointment;
+      setPrescriptionText(currentApt.prescription || '');
+      setReasonText(currentApt.reason || '');   // ← sync reason
+      dispatch(setReduxStatus(currentApt.status));
+      setUploadedReports([]);
     }
-  }, [selectedAppointment, dispatch]);
+  }, [selectedAppointment, appointments, dispatch]);
 
   // --- Handlers ---
   const handleUpdateStatus = async (id: string, newStatus: AppointmentStatus) => {
-    saveOverride(id, { status: newStatus });
-    setAppointments(prev => prev.map(apt => apt.id === id ? { ...apt, status: newStatus } : apt));
-    if (selectedAppointment) {
-      setSelectedAppointment({ ...selectedAppointment, status: newStatus });
-      dispatch(setReduxStatus(newStatus));
+    try {
+      const token = await getToken();
+      if (!token) throw new Error("No token found");
+      const cleanToken = token.replace(/"/g, '').trim();
+
+      const dbStatus = newStatus === 'Upcoming' ? 'confirmed' : newStatus.toLowerCase();
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_SERVER_URL}/doctor/updateStatus/${id}`,
+        { status: dbStatus },
+        {
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      saveOverride(id, { status: newStatus });
+      await fetchAppointments();
+      if (selectedAppointment) {
+        setSelectedAppointment(prev => prev ? { ...prev, status: newStatus } : null);
+        dispatch(setReduxStatus(newStatus));
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Failed to update status on backend.');
     }
   };
 
@@ -204,11 +283,12 @@ export default function AppointmentsClient({ specialization }: AppointmentsClien
         appointmentDate: new Date().toISOString(),
         prescription: prescriptionText,
         reasonForVisit: reasonText,          // ← use the editable reason state
-        appointmentStatus: selectedAppointment.status
+        appointmentStatus: selectedAppointment.status,
+        reports: uploadedReports
       };
 
       const response = await axios.put(
-        `${process.env.NEXT_PUBLIC_SERVER_URL}/patient/savePrescription/${selectedAppointment.id}`,
+        `${process.env.NEXT_PUBLIC_SERVER_URL}/patient/savePrescription/${selectedAppointment.patientUserId}`,
         { ...payload, appointmentStatus: reduxStatus },
         {
           headers: {
@@ -220,14 +300,9 @@ export default function AppointmentsClient({ specialization }: AppointmentsClien
       );
 
       saveOverride(selectedAppointment.id, { prescription: prescriptionText });
-      // Also update reason in the local list so the table reflects the new value
-      setAppointments(prev => prev.map(apt =>
-        apt.id === selectedAppointment.id
-          ? { ...apt, prescription: prescriptionText, reason: reasonText }
-          : apt
-      ));
-
       console.log("Prescription saved successfully!", response.data);
+      
+      await fetchAppointments();
       setSelectedAppointment(null);
 
     } catch (error: any) {
@@ -314,7 +389,6 @@ export default function AppointmentsClient({ specialization }: AppointmentsClien
                         <div className="flex items-center gap-2 text-slate-600">
                           <Clock size={14} className="text-teal-500"/> {apt.time}
                         </div>
-                        {/* Show reason on mobile too */}
                         <div className="flex items-center gap-2 text-teal-600 font-medium">
                           <span className="text-xs">{apt.reason}</span>
                         </div>
@@ -368,7 +442,6 @@ export default function AppointmentsClient({ specialization }: AppointmentsClien
                             </div>
                           </td>
                           <td className="px-6 py-4">
-                            {/* ← specialization shows here when reasonForVisit is empty */}
                             <span className="text-sm text-slate-700 font-medium">{apt.reason}</span>
                           </td>
                           <td className="px-6 py-4">
@@ -393,111 +466,192 @@ export default function AppointmentsClient({ specialization }: AppointmentsClien
         </div>
 
       {/* --- MODAL --- */}
-      {selectedAppointment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden animate-fade-up relative">
+      {selectedAppointment && (() => {
+        // Resolve latest data from state
+        const currentApt = appointments.find(a => a.id === selectedAppointment.id) || selectedAppointment;
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden animate-fade-up relative">
 
-            {/* Modal Header */}
-            <div className="p-6 border-b border-slate-100 flex items-start justify-between bg-slate-50/50">
-              <div className="flex items-center gap-4">
-                <img src={selectedAppointment.avatar} alt="" className="w-16 h-16 rounded-full object-cover border-2 border-white shadow-sm" />
-                <div>
-                  <h2 className="text-xl font-bold text-slate-800">{selectedAppointment.patientName}</h2>
-                  <p className="text-sm text-slate-500">{selectedAppointment.age}y • {selectedAppointment.gender} • {selectedAppointment.phone}</p>
-                  {/* Show reason in modal header too */}
-                  <span className="inline-flex items-center gap-1 mt-1 text-xs font-semibold text-teal-700 bg-teal-50 border border-teal-100 px-2 py-0.5 rounded-full">
-                    {selectedAppointment.reason}
-                  </span>
-                </div>
-              </div>
-              <button onClick={() => setSelectedAppointment(null)} className="p-2 bg-white rounded-full text-slate-400 hover:text-slate-600 shadow-sm border border-slate-100">
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
-
-              {/* Info Grid — Time | Status | Reason (editable) */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {/* Time */}
-                <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Time</p>
-                  <p className="font-medium text-slate-800">{selectedAppointment.date}</p>
-                  <p className="text-sm text-slate-500">{selectedAppointment.time}</p>
-                </div>
-
-                {/* Status */}
-                <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Status</p>
-                  <div className="mt-1"><StatusBadge status={selectedAppointment.status} /></div>
-                </div>
-
-                {/* Reason (editable input) */}
-                <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Reason for Visit</p>
-                  <input
-                    value={reasonText}
-                    onChange={(e) => setReasonText(e.target.value)}
-                    placeholder="e.g. Cardiology"
-                    className="w-full mt-1 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm text-slate-800 font-medium focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-50 transition-all"
-                  />
-                </div>
-              </div>
-
-              {/* Prescription */}
-              <div>
-                <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
-                  <Pill size={16} className="text-teal-600"/> Write Prescription / Notes
-                </h3>
-                <textarea
-                  value={prescriptionText}
-                  onChange={(e) => setPrescriptionText(e.target.value)}
-                  placeholder="Type medicines, dosages, and medical notes here..."
-                  className="w-full h-32 p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-50 transition-all resize-y"
-                />
-              </div>
-
-              {/* Status Actions */}
-              {selectedAppointment.status === 'Upcoming' && (
-                <div className="pt-4 border-t border-slate-100">
-                  <h3 className="text-sm font-bold text-slate-800 mb-3">Quick Actions</h3>
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <button
-                      onClick={() => handleUpdateStatus(selectedAppointment.id, 'Completed')}
-                      className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-green-50 text-green-700 hover:bg-green-100 font-semibold rounded-xl transition-colors"
-                    >
-                      <CheckCircle size={18} /> Mark as Completed
-                    </button>
-                    <button
-                      onClick={() => handleUpdateStatus(selectedAppointment.id, 'Cancelled')}
-                      className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-red-50 text-red-700 hover:bg-red-100 font-semibold rounded-xl transition-colors"
-                    >
-                      <XCircle size={18} /> Cancel Appointment
-                    </button>
+              {/* Modal Header */}
+              <div className="p-6 border-b border-slate-100 flex items-start justify-between bg-slate-50/50">
+                <div className="flex items-center gap-4">
+                  <img src={currentApt.avatar} alt="" className="w-16 h-16 rounded-full object-cover border-2 border-white shadow-sm" />
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-800">{currentApt.patientName}</h2>
+                    <p className="text-sm text-slate-500">{currentApt.age}y • {currentApt.gender} • {currentApt.phone}</p>
+                    <span className="inline-flex items-center gap-1 mt-1 text-xs font-semibold text-teal-700 bg-teal-50 border border-teal-100 px-2 py-0.5 rounded-full">
+                      {currentApt.reason}
+                    </span>
                   </div>
                 </div>
-              )}
-            </div>
+                <button onClick={() => setSelectedAppointment(null)} className="p-2 bg-white rounded-full text-slate-400 hover:text-slate-600 shadow-sm border border-slate-100">
+                  <X size={20} />
+                </button>
+              </div>
 
-            {/* Modal Footer */}
-            <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
-              <button
-                onClick={() => setSelectedAppointment(null)}
-                className="px-5 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-200 bg-slate-100 rounded-xl transition-colors"
-              >
-                Close
-              </button>
-              <button
-                onClick={handleSavePrescription}
-                className="px-5 py-2.5 text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 rounded-xl transition-colors shadow-sm"
-              >
-                Save File
-              </button>
+              {/* Modal Body */}
+              <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+
+                {/* Info Grid — Time | Status | Reason */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Time</p>
+                    <p className="font-medium text-slate-800">{currentApt.date}</p>
+                    <p className="text-sm text-slate-500">{currentApt.time}</p>
+                  </div>
+
+                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Status</p>
+                    <div className="mt-1"><StatusBadge status={currentApt.status} /></div>
+                  </div>
+
+                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Reason for Visit</p>
+                    <input
+                      value={reasonText}
+                      onChange={(e) => setReasonText(e.target.value)}
+                      placeholder="e.g. Cardiology"
+                      className="w-full mt-1 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm text-slate-800 font-medium focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-50 transition-all"
+                    />
+                  </div>
+                </div>
+
+                {/* Prescription */}
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                    <Pill size={16} className="text-teal-600"/> Write Prescription / Notes
+                  </h3>
+                  <textarea
+                    value={prescriptionText}
+                    onChange={(e) => setPrescriptionText(e.target.value)}
+                    placeholder="Type medicines, dosages, and medical notes here..."
+                    className="w-full h-32 p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-50 transition-all resize-y animate-fade-up"
+                  />
+                </div>
+
+                {/* Reports upload for Doctor */}
+                <div className="space-y-3 pt-3 border-t border-slate-100 animate-fade-up">
+                  <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                    <UploadCloud size={16} className="text-teal-600"/> Patient Report Vault (PDFs)
+                  </h3>
+                  
+                  {/* Existing reports from this doctor's medical records */}
+                  {currentApt.medicalRecords && currentApt.medicalRecords.length > 0 && (() => {
+                    const allReports = currentApt.medicalRecords.flatMap((rec: any) => rec.reports || []);
+                    return allReports.length > 0 ? (
+                      <div className="space-y-2">
+                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Saved Reports</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {allReports.map((url: string, uIdx: number) => (
+                            <a
+                              key={uIdx}
+                              href={url}
+                              download={`report-${uIdx + 1}.pdf`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-2 p-3 rounded-xl border border-slate-100 bg-slate-50 hover:bg-teal-50 hover:border-teal-200 transition-all group"
+                            >
+                              <div className="p-1.5 rounded-lg bg-rose-50 shrink-0">
+                                <FileText size={14} className="text-rose-500" />
+                              </div>
+                              <span className="text-xs font-semibold text-slate-700 truncate flex-1">Report #{uIdx + 1}.pdf</span>
+                              <span className="text-[10px] text-teal-600 font-bold group-hover:underline shrink-0">↓ Download</span>
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null;
+                  })()}
+
+                  {/* Newly uploaded in this session */}
+                  {uploadedReports.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Just Uploaded (Session)</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {uploadedReports.map((url, uIdx) => (
+                          <a
+                            key={uIdx}
+                            href={url}
+                            download={`new-report-${uIdx + 1}.pdf`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 p-3 rounded-xl border border-teal-100 bg-teal-50/50 group"
+                          >
+                            <FileText size={16} className="text-teal-500 shrink-0" />
+                            <span className="text-xs font-semibold text-slate-700 truncate flex-1">New Report #{uIdx + 1}.pdf</span>
+                            <span className="text-[10px] text-teal-600 font-bold group-hover:underline shrink-0">↓ Download</span>
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <label className="relative flex flex-col items-center justify-center border-2 border-dashed border-slate-200 hover:border-teal-500/30 rounded-xl p-4 bg-slate-50/50 hover:bg-slate-50 cursor-pointer transition-all">
+                    {isUploading ? (
+                      <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+                        <Loader2 size={16} className="animate-spin text-teal-600" />
+                        <span>Uploading PDF documents...</span>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center text-center">
+                        <UploadCloud size={20} className="text-teal-600 mb-1.5" />
+                        <span className="text-xs font-bold text-slate-700">Attach PDF Patient Reports</span>
+                        <span className="text-[10px] text-slate-400 mt-0.5">Click to choose one or more files to attach to this visit record</span>
+                      </div>
+                    )}
+                    <input 
+                      type="file" 
+                      accept="application/pdf" 
+                      multiple 
+                      disabled={isUploading}
+                      onChange={handleUploadReport}
+                      className="hidden" 
+                    />
+                  </label>
+                </div>
+
+                {/* Status Actions */}
+                {currentApt.status === 'Upcoming' && (
+                  <div className="pt-4 border-t border-slate-100">
+                    <h3 className="text-sm font-bold text-slate-800 mb-3">Quick Actions</h3>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <button
+                        onClick={() => handleUpdateStatus(currentApt.id, 'Completed')}
+                        className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-green-50 text-green-700 hover:bg-green-100 font-semibold rounded-xl transition-colors"
+                      >
+                        <CheckCircle size={18} /> Mark as Completed
+                      </button>
+                      <button
+                        onClick={() => handleUpdateStatus(currentApt.id, 'Cancelled')}
+                        className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-red-50 text-red-700 hover:bg-red-100 font-semibold rounded-xl transition-colors"
+                      >
+                        <XCircle size={18} /> Cancel Appointment
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
+                <button
+                  onClick={() => setSelectedAppointment(null)}
+                  className="px-5 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-200 bg-slate-100 rounded-xl transition-colors"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={handleSavePrescription}
+                  className="px-5 py-2.5 text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 rounded-xl transition-colors shadow-sm"
+                >
+                  Save File
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </DashboardShell>
   );
 }

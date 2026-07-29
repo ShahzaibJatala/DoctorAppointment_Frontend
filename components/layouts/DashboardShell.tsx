@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { removeToken } from "@/app/actions/token";
 
-type Role = "patient" | "doctor" | "admin";
+type Role = "patient" | "doctor" | "admin" | "compounder";
 
 type NavItem = {
   href: string;
@@ -40,6 +40,7 @@ const NAV_CONFIG: Record<Role, NavItem[]> = {
     { href: "/doctor/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/doctor/schedule", label: "Schedule", icon: CalendarDays },
     { href: "/doctor/appointments", label: "Appointments", icon: Calendar },
+    { href: "/doctor/compounders", label: "Compounders", icon: Users },
     { href: "/doctor/profile", label: "Profile", icon: Settings },
   ],
   admin: [
@@ -47,12 +48,18 @@ const NAV_CONFIG: Record<Role, NavItem[]> = {
     { href: "/admin/doctors", label: "Doctors", icon: Stethoscope },
     { href: "/admin/users", label: "Users", icon: Users },
   ],
+  compounder: [
+    { href: "/compounder/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/compounder/appointments", label: "Book Walk-In", icon: Search },
+    { href: "/compounder/schedule", label: "Doctor Schedule", icon: CalendarDays },
+  ],
 };
 
 const ROLE_HOME: Record<Role, string> = {
   patient: "/patient/dashboard",
   doctor: "/doctor/dashboard",
   admin: "/admin/dashboard",
+  compounder: "/compounder/dashboard",
 };
 
 export interface DashboardShellProps {

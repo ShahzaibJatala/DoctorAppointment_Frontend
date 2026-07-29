@@ -4,11 +4,51 @@ import { Heart, Menu, X, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
+import { getToken, removeToken } from "@/app/actions/token";
+
+function parseJwt(token: string) {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      window.atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    return null;
+  }
+}
 
 const Header = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
+
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [dashboardUrl, setDashboardUrl] = useState("/login");
+
+  useEffect(() => {
+    async function checkLogin() {
+      const token = await getToken();
+      if (token) {
+        setIsLoggedIn(true);
+        const payload = parseJwt(token);
+        if (payload?.role) {
+          setDashboardUrl(`/${payload.role}/dashboard`);
+        }
+      }
+    }
+    checkLogin();
+  }, []);
+
+  const handleLogout = async () => {
+    await removeToken();
+    setIsLoggedIn(false);
+    window.location.href = "/";
+  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -54,25 +94,49 @@ const Header = () => {
 
             {/* Desktop Auth Buttons */}
             <div className="hidden items-center gap-2 md:flex">
-              <Link href="/login">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="cursor-pointer text-slate-600 hover:text-slate-900 font-medium rounded-xl px-5 transition-all duration-200"
-                >
-                  Log in
-                </Button>
-              </Link>
-              <Link href="/register">
-                <Button
-                  variant="hero"
-                  size="sm"
-                  className="cursor-pointer text-white rounded-xl px-6 shadow-[0_2px_12px_rgba(22,188,200,0.3)] hover:shadow-[0_4px_20px_rgba(22,188,200,0.4)] transition-all duration-300"
-                >
-                  Get Started
-                  <ChevronRight className="ml-1 h-3.5 w-3.5" />
-                </Button>
-              </Link>
+              {isLoggedIn ? (
+                <>
+                  <Link href={dashboardUrl}>
+                    <Button
+                      variant="hero"
+                      size="sm"
+                      className="cursor-pointer text-white rounded-xl px-6 shadow-[0_2px_12px_rgba(22,188,200,0.3)] hover:shadow-[0_4px_20px_rgba(22,188,200,0.4)] transition-all duration-300"
+                    >
+                      Dashboard
+                    </Button>
+                  </Link>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleLogout}
+                    className="cursor-pointer text-slate-600 hover:text-slate-900 font-medium rounded-xl px-5 transition-all duration-200"
+                  >
+                    Log out
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Link href="/login">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="cursor-pointer text-slate-600 hover:text-slate-900 font-medium rounded-xl px-5 transition-all duration-200"
+                    >
+                      Log in
+                    </Button>
+                  </Link>
+                  <Link href="/register">
+                    <Button
+                      variant="hero"
+                      size="sm"
+                      className="cursor-pointer text-white rounded-xl px-6 shadow-[0_2px_12px_rgba(22,188,200,0.3)] hover:shadow-[0_4px_20px_rgba(22,188,200,0.4)] transition-all duration-300"
+                    >
+                      Get Started
+                      <ChevronRight className="ml-1 h-3.5 w-3.5" />
+                    </Button>
+                  </Link>
+                </>
+              )}
             </div>
 
             {/* Mobile Menu Button */}
@@ -103,17 +167,36 @@ const Header = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="container mx-auto px-4 py-6 space-y-3">
-              <Link href="/login" onClick={() => setIsOpen(false)}>
-                <Button variant="outline" className="w-full rounded-xl h-12 text-base font-medium border-slate-200 hover:border-[#16BCC8] hover:text-[#16BCC8] transition-all duration-200">
-                  Log in
-                </Button>
-              </Link>
-              <Link href="/register" onClick={() => setIsOpen(false)}>
-                <Button variant="hero" className="w-full rounded-xl h-12 text-base font-medium text-white shadow-[0_2px_12px_rgba(22,188,200,0.3)]">
-                  Get Started
-                  <ChevronRight className="ml-1 h-4 w-4" />
-                </Button>
-              </Link>
+              {isLoggedIn ? (
+                <>
+                  <Link href={dashboardUrl} onClick={() => setIsOpen(false)}>
+                    <Button variant="hero" className="w-full rounded-xl h-12 text-base font-medium text-white shadow-[0_2px_12px_rgba(22,188,200,0.3)]">
+                      Dashboard
+                    </Button>
+                  </Link>
+                  <Button
+                    variant="outline"
+                    onClick={() => { setIsOpen(false); handleLogout(); }}
+                    className="w-full rounded-xl h-12 text-base font-medium border-slate-200 hover:border-red-500 hover:text-red-500 transition-all duration-200"
+                  >
+                    Log out
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Link href="/login" onClick={() => setIsOpen(false)}>
+                    <Button variant="outline" className="w-full rounded-xl h-12 text-base font-medium border-slate-200 hover:border-[#16BCC8] hover:text-[#16BCC8] transition-all duration-200">
+                      Log in
+                    </Button>
+                  </Link>
+                  <Link href="/register" onClick={() => setIsOpen(false)}>
+                    <Button variant="hero" className="w-full rounded-xl h-12 text-base font-medium text-white shadow-[0_2px_12px_rgba(22,188,200,0.3)]">
+                      Get Started
+                      <ChevronRight className="ml-1 h-4 w-4" />
+                    </Button>
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </div>
