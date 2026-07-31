@@ -33,6 +33,8 @@ interface Appointment {
   phone?: string;
   prescription?: string;
   medicalRecords?: any[];
+  paymentMethod?: string;
+  bankTransferReceiptUrl?: string;
 }
 
 // --- Props ---
@@ -106,6 +108,11 @@ export default function AppointmentsClient({ specialization }: AppointmentsClien
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'All' | 'Upcoming' | 'Completed' | 'Cancelled'>('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, searchQuery]);
 
   // Modal states
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
@@ -167,6 +174,8 @@ export default function AppointmentsClient({ specialization }: AppointmentsClien
           prescription: patient.prescription || '',
           medicalRecords: patient.medicalRecords || [],
           patientDocId: patient.patientDocId,
+          paymentMethod: patient.paymentMethod,
+          bankTransferReceiptUrl: patient.bankTransferReceiptUrl,
         };
       });
 
@@ -318,6 +327,10 @@ export default function AppointmentsClient({ specialization }: AppointmentsClien
     return matchesTab && matchesSearch;
   });
 
+  const PAGE_SIZE = 10;
+  const totalPages = Math.ceil(filteredAppointments.length / PAGE_SIZE);
+  const paginatedAppointments = filteredAppointments.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
   return (
     <DashboardShell role="doctor" activeHref="/doctor/appointments" sidebarWidth="narrow" showHealthTip={false}>
         <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-lg border-b border-slate-200 px-4 sm:px-6 py-4">
@@ -369,7 +382,7 @@ export default function AppointmentsClient({ specialization }: AppointmentsClien
               <>
                 {/* --- MOBILE VIEW (CARDS) --- */}
                 <div className="md:hidden divide-y divide-slate-100">
-                  {filteredAppointments.map((apt) => (
+                  {paginatedAppointments.map((apt) => (
                     <div key={apt.id} className="p-4 space-y-4">
                       <div className="flex justify-between items-start">
                         <div className="flex items-center gap-3">
@@ -418,7 +431,7 @@ export default function AppointmentsClient({ specialization }: AppointmentsClien
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {filteredAppointments.map((apt) => (
+                      {paginatedAppointments.map((apt) => (
                         <tr key={apt.id} className="hover:bg-slate-50/50 transition-colors group">
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-3">
@@ -460,6 +473,34 @@ export default function AppointmentsClient({ specialization }: AppointmentsClien
                     </tbody>
                   </table>
                 </div>
+
+                {/* Pagination Footer */}
+                {totalPages > 1 && (
+                  <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/80 flex items-center justify-between">
+                     <span className="text-xs text-slate-500 font-medium">
+                       Showing {((currentPage - 1) * PAGE_SIZE) + 1} to {Math.min(currentPage * PAGE_SIZE, filteredAppointments.length)} of {filteredAppointments.length} appointments
+                     </span>
+                     <div className="flex gap-2">
+                       <button
+                         onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                         disabled={currentPage === 1}
+                         className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50 cursor-pointer"
+                       >
+                         Previous
+                       </button>
+                       <span className="text-xs font-semibold text-slate-600 flex items-center px-1">
+                         Page {currentPage} of {totalPages}
+                       </span>
+                       <button
+                         onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                         disabled={currentPage === totalPages}
+                         className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50 cursor-pointer"
+                       >
+                         Next
+                       </button>
+                     </div>
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -516,6 +557,34 @@ export default function AppointmentsClient({ specialization }: AppointmentsClien
                     />
                   </div>
                 </div>
+
+                {/* Bank Transfer Receipt */}
+                {currentApt.paymentMethod === 'bank_transfer' && (
+                  <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl">
+                    <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                      <Download size={16} className="text-blue-600" /> Bank Transfer Receipt
+                    </h3>
+                    {currentApt.bankTransferReceiptUrl ? (
+                      <div className="space-y-3">
+                        <img
+                          src={currentApt.bankTransferReceiptUrl}
+                          alt="Bank transfer receipt"
+                          className="w-full max-h-48 object-contain rounded-xl border border-blue-100 bg-white"
+                        />
+                        <a
+                          href={currentApt.bankTransferReceiptUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center justify-center gap-2 py-2 px-4 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 transition-colors"
+                        >
+                          <Download size={14} /> View Full Receipt
+                        </a>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-amber-700">Receipt not yet uploaded by patient.</p>
+                    )}
+                  </div>
+                )}
 
                 {/* Prescription */}
                 <div>

@@ -1,24 +1,19 @@
 // app/page.tsx
 import {
-  LayoutDashboard,
   CalendarDays,
   Users,
-  MessageSquare,
   Wallet,
-  Settings,
+  Star,
   Bell,
   Search,
   CheckCircle,
   Video,
   MapPin,
   MoreHorizontal,
-  Star,
   ChevronRight,
-  Menu,
   LogOut,
   Heart,
-  ArrowRight,
-  Sparkles
+  ArrowRight
 } from 'lucide-react';
 import Link from 'next/link';
 import DashboardShell from '@/components/layouts/DashboardShell';
@@ -44,22 +39,6 @@ type Review = {
   comment: string;
   date: string;
 };
-
-// --- Mock Data ---
-const stats = [
-  { label: 'Today\'s Appointments', value: '12', icon: CalendarDays, color: 'text-[#16BCC8]', bg: 'bg-[#16BCC8]/8' },
-  { label: 'Total Patients', value: '1,240', icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
-  { label: 'Monthly Earnings', value: '$8,450', icon: Wallet, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-  { label: 'Average Rating', value: '4.9', icon: Star, color: 'text-[#F59F0A]', bg: 'bg-amber-50' },
-];
-
-const todayAppointments: Appointment[] = [
-  { id: '1', patientName: 'Alice Freeman', patientAvatar: 'https://i.pravatar.cc/150?u=20', time: '09:00 AM', type: 'In-Clinic', status: 'Completed', symptom: 'Migraine Checkup' },
-  { id: '2', patientName: 'Mark Robinson', patientAvatar: 'https://i.pravatar.cc/150?u=21', time: '10:30 AM', type: 'Online', status: 'Upcoming', symptom: 'Follow-up: Flu' },
-  { id: '3', patientName: 'Sarah Jenkins', patientAvatar: 'https://i.pravatar.cc/150?u=22', time: '11:15 AM', type: 'In-Clinic', status: 'Upcoming', symptom: 'Skin Rash' },
-  { id: '4', patientName: 'David Kim', patientAvatar: 'https://i.pravatar.cc/150?u=23', time: '02:00 PM', type: 'Online', status: 'Upcoming', symptom: 'General Consultation' },
-  { id: '5', patientName: 'Emma Watson', patientAvatar: 'https://i.pravatar.cc/150?u=24', time: '04:45 PM', type: 'In-Clinic', status: 'Cancelled', symptom: 'Back Pain' },
-];
 
 const reviews: Review[] = [
   { id: '1', patientName: 'John D.', rating: 5, comment: 'Dr. Smith was incredibly patient and kind.', date: '2h ago' },
@@ -102,9 +81,9 @@ const AppointmentCard = ({ apt }: { apt: Appointment }) => (
             <button className="p-2 text-slate-300 hover:text-[#16BCC8] hover:bg-[#16BCC8]/8 rounded-xl transition-all duration-200" title="View Details">
               <MoreHorizontal size={18} />
             </button>
-            <button className="px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-[#16BCC8] to-[#0ea5a9] rounded-xl transition-all duration-300 shadow-[0_2px_8px_rgba(22,188,200,0.3)] hover:shadow-[0_4px_16px_rgba(22,188,200,0.4)]">
-              {apt.type === 'Online' ? 'Join' : 'Start'}
-            </button>
+            <Link href="/doctor/appointments" className="px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-[#16BCC8] to-[#0ea5a9] rounded-xl transition-all duration-300 shadow-[0_2px_8px_rgba(22,188,200,0.3)] hover:shadow-[0_4px_16px_rgba(22,188,200,0.4)]">
+              Manage
+            </Link>
           </>
         )}
         {apt.status === 'Completed' && (
@@ -117,7 +96,7 @@ const AppointmentCard = ({ apt }: { apt: Appointment }) => (
   </div>
 );
 
-// --- Server Data Fetching Function ---
+// --- Server Data Fetching Functions ---
 async function getProfileData() {
   const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL;
   const cookieStore = await cookies();
@@ -149,22 +128,77 @@ async function getProfileData() {
   }
 }
 
-// 1. Convert to an async function
+async function getPatientsData() {
+  const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL;
+  const cookieStore = await cookies();
+  const token = cookieStore.get('accessToken')?.value;
+
+  if (!token) return [];
+
+  try {
+    const response = await fetch(`${serverUrl}/doctor/getPatients`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      cache: 'no-store' 
+    });
+
+    if (!response.ok) return [];
+    return await response.json();
+  } catch (error) {
+    console.error("Error fetching patients data on server:", error);
+    return [];
+  }
+}
+
 export default async function DoctorDashboard() {
-  
-  // 2. Fetch data directly inside the component body
   const profileData = await getProfileData();
+  const patientsData = await getPatientsData();
   
-  // 3. Define fallback values if profile is missing
   const doctorName = profileData?.fullName || 'Dr. Smith';
   const profilePhotoUrl = profileData?.profilePictureUrl || 'https://i.pravatar.cc/150?u=doctor';
   const specialization = profileData?.specialization || 'General Physician';
+  const consultationFee = profileData?.consultationFee || 150;
 
-  // 4. Override appointment symptoms with doctor's real specialization
-  const specializedAppointments: Appointment[] = todayAppointments.map(apt => ({
-    ...apt,
-    symptom: `Consultation · ${specialization}`,
-  }));
+  // Map backend appointments
+  const specializedAppointments: Appointment[] = patientsData.map((item: any, idx: number) => {
+    const statusLower = item.status?.toLowerCase();
+    const normalizedStatus: Appointment['status'] = 
+      statusLower === 'confirmed' || statusLower === 'upcoming' || statusLower === 'pending' || statusLower === 'checked-in' || statusLower === 'in-progress'
+        ? 'Upcoming'
+        : statusLower === 'completed'
+        ? 'Completed'
+        : 'Cancelled';
+
+    const timeFormatted = item.startTime 
+      ? new Date(item.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
+      : '09:00 AM';
+
+    return {
+      id: item.appointmentId || item._id || idx.toString(),
+      patientName: item.name || item.email.split('@')[0],
+      patientAvatar: item.profilePictureUrl || `https://ui-avatars.com/api/?name=${item.name || 'P'}&background=0D8ABC&color=fff`,
+      time: timeFormatted,
+      type: item.appointmentType === 'Online' ? 'Online' : 'In-Clinic',
+      status: normalizedStatus,
+      symptom: item.reasonForVisit || `Consultation · ${specialization}`,
+    };
+  });
+
+  // Calculate Metrics
+  const todayCount = specializedAppointments.filter(a => a.status === 'Upcoming').length;
+  const uniquePatientsCount = new Set(patientsData.map((p: any) => p._id)).size;
+  const completedCount = patientsData.filter((p: any) => p.status?.toLowerCase() === 'completed').length;
+  const earnings = completedCount * consultationFee;
+
+  const stats = [
+    { label: "Today's Appointments", value: todayCount.toString(), icon: CalendarDays, color: 'text-[#16BCC8]', bg: 'bg-[#16BCC8]/8' },
+    { label: 'Total Patients', value: uniquePatientsCount.toString(), icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
+    { label: 'Monthly Earnings', value: `PKR ${earnings.toLocaleString()}`, icon: Wallet, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    { label: 'Average Rating', value: '4.9', icon: Star, color: 'text-[#F59F0A]', bg: 'bg-amber-50' },
+  ];
 
   const handleLogout = async () => {
     'use server';
@@ -207,7 +241,7 @@ export default async function DoctorDashboard() {
           {/* Stats Overview */}
           <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
             {stats.map((stat, i) => (
-              <div key={i} className={`bg-white p-6 rounded-2xl border border-slate-100 shadow-card hover:shadow-elevated hover:-translate-y-0.5 transition-all duration-300 animate-fade-up stagger-${i + 1}`}>
+              <div key={i} className={`bg-white p-6 rounded-2xl border border-slate-100 shadow-card hover:shadow-elevated hover:-translate-y-0.5 transition-all duration-300 animate-fade-up`}>
                 <div className="flex justify-between items-start mb-4">
                   <div className={`p-3 rounded-xl ${stat.bg}`}>
                     <stat.icon className={`w-6 h-6 ${stat.color}`} />
@@ -228,13 +262,15 @@ export default async function DoctorDashboard() {
             <div className="lg:col-span-2 space-y-6">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-bold text-slate-800">Today's Appointments</h2>
-                <button className="text-sm font-semibold text-[#16BCC8] hover:text-[#0ea5a9] flex items-center gap-1 transition-colors duration-200">
+                <Link href="/doctor/appointments" className="text-sm font-semibold text-[#16BCC8] hover:text-[#0ea5a9] flex items-center gap-1 transition-colors duration-200">
                   View Calendar <ArrowRight size={14} />
-                </button>
+                </Link>
               </div>
               
               <div className="space-y-4">
-                {specializedAppointments.map((apt) => (
+                {specializedAppointments.length === 0 ? (
+                  <p className="text-sm text-slate-500 italic py-6 text-center">No appointments scheduled.</p>
+                ) : specializedAppointments.map((apt) => (
                   <AppointmentCard key={apt.id} apt={apt} />
                 ))}
               </div>
@@ -247,7 +283,7 @@ export default async function DoctorDashboard() {
               <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-card">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="font-bold text-slate-800">Availability</h3>
-                  <button className="text-xs bg-slate-50 hover:bg-slate-100 px-3 py-1.5 rounded-lg transition-colors duration-200 font-semibold text-slate-500 border border-slate-100">Edit</button>
+                  <Link href="/doctor/schedule" className="text-xs bg-slate-50 hover:bg-slate-100 px-3 py-1.5 rounded-lg transition-colors duration-200 font-semibold text-slate-500 border border-slate-100">Edit</Link>
                 </div>
                 <div className="space-y-4">
                   <div className="flex items-center gap-4">

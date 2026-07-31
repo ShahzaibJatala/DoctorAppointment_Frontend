@@ -3,7 +3,7 @@
 import { Button } from "@/components/UI/button";
 import { Input } from "@/components/UI/input";
 import { Label } from "@/components/UI/label";
-import { Heart, Mail, Lock, ArrowRight, X, KeyRound, AlertCircle, Shield, Star, Users } from "lucide-react"; // Added AlertCircle
+import { Heart, Mail, Lock, ArrowRight, X, KeyRound, AlertCircle, Shield, Star, Users, Eye, EyeOff } from "lucide-react"; // Added AlertCircle, Eye, EyeOff
 import Link from "next/link";
 import { useEffect, useState, Suspense } from "react";
 import { loginAction } from "../actions/auth";
@@ -20,6 +20,8 @@ const LoginContent = () => {
   const [form, setForm] = useState({ email: "", password: "" });
   const [loginError, setLoginError] = useState(""); // 👈 Added Error State
   const [animate, setAnimate] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
 
   // Forgot Password Flow States
   const [resetEmail, setResetEmail] = useState("");
@@ -61,10 +63,10 @@ const LoginContent = () => {
 
       router.push(`/${role}/dashboard`)
       setAnimate(false);
-    } catch (error) {
+    } catch (error: any) {
       console.log("Login Error:", error);
       // 👈 Set the error message to display to the user
-      setLoginError("Invalid email or password. Please try again.");
+      setLoginError(error.message || "Invalid email or password. Please try again.");
       setAnimate(false);
     }
   };
@@ -199,15 +201,26 @@ const LoginContent = () => {
                 <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-300" />
                 <Input
                   id="password"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
-                  className="pl-11 h-12 rounded-xl border-slate-200 bg-slate-50/50 focus:bg-white focus:border-[#16BCC8] transition-all duration-200"
+                  className="pl-11 pr-10 h-12 rounded-xl border-slate-200 bg-slate-50/50 focus:bg-white focus:border-[#16BCC8] transition-all duration-200"
                   value={form.password}
                   onChange={(e) => {
                     setForm({ ...form, password: e.target.value });
                     setLoginError(""); // Clear error when user types
                   }}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                >
+                  {showPassword ? (
+                    <EyeOff size={16} />
+                  ) : (
+                    <Eye size={16} />
+                  )}
+                </button>
               </div>
             </div>
 
@@ -354,7 +367,27 @@ const LoginContent = () => {
                 <Label htmlFor="new-password">New Password</Label>
                 <div className="relative">
                   <KeyRound className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-300" />
-                  <Input id="new-password" type="password" required placeholder="••••••••" minLength={6} className="pl-11 h-12 rounded-xl" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+                <Input 
+                  id="new-password" 
+                  type={showNewPassword ? "text" : "password"} 
+                  required 
+                  placeholder="••••••••" 
+                  minLength={6} 
+                  className="pl-11 pr-10 h-12 rounded-xl" 
+                  value={newPassword} 
+                  onChange={(e) => setNewPassword(e.target.value)} 
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                >
+                  {showNewPassword ? (
+                    <EyeOff size={16} />
+                  ) : (
+                    <Eye size={16} />
+                  )}
+                </button>
                 </div>
               </div>
               <Button type="submit" variant="hero" className="w-full h-12 rounded-xl text-white" disabled={isLoading}>{isLoading ? "Updating..." : "Update Password"}</Button>

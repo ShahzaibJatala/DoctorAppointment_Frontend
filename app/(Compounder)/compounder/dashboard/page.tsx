@@ -20,10 +20,11 @@ interface PatientQueueItem {
   startTime: string;
   endTime: string;
   appointmentType: 'Clinic' | 'Online';
-  paymentMethod: 'card' | 'cash' | 'easypaisa' | 'jazzcash';
+  paymentMethod: 'card' | 'cash' | 'easypaisa' | 'jazzcash' | 'bank_transfer';
   status: 'pending' | 'confirmed' | 'cancelled' | 'checked-in' | 'in-progress' | 'Completed' | 'completed';
   tokenNumber?: number;
   mobileWalletNumber?: string;
+  bankTransferReceiptUrl?: string;
 }
 
 export default function CompounderDashboard() {

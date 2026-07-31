@@ -14,7 +14,9 @@ import {
   Info,
   Loader2,
   Heart,
-  ArrowLeft
+  ArrowLeft,
+  CreditCard,
+  Building2
 } from 'lucide-react';
 
 import axios from 'axios';
@@ -101,7 +103,11 @@ export default function DoctorProfileForm() {
     clinicAddress: '',   
     city: '',            
     province: '',        
-    consultationFee: ''  
+    consultationFee: '',
+    // Bank details
+    bankName: '',
+    accountHolderName: '',
+    accountNumber: ''
   });
 
   const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL;
@@ -143,7 +149,10 @@ export default function DoctorProfileForm() {
           clinicAddress: data.clinicAddress || '',
           city: data.city || '',
           province: data.province || '',
-          consultationFee: data.consultationFee || ''
+          consultationFee: data.consultationFee || '',
+          bankName: data.bankName || '',
+          accountHolderName: data.accountHolderName || '',
+          accountNumber: data.accountNumber || ''
         });
 
         if (data.profilePictureUrl) {
@@ -196,6 +205,11 @@ export default function DoctorProfileForm() {
       if(formData.city) finalPayload.append('city', formData.city);
       if(formData.province) finalPayload.append('province', formData.province);
       if(formData.consultationFee) finalPayload.append('consultationFee', String(formData.consultationFee));
+
+      // Bank details
+      if(formData.bankName) finalPayload.append('bankName', formData.bankName);
+      if(formData.accountHolderName) finalPayload.append('accountHolderName', formData.accountHolderName);
+      if(formData.accountNumber) finalPayload.append('accountNumber', formData.accountNumber);
       
       if (profilePhoto) {
           finalPayload.append('Image', profilePhoto);
@@ -382,7 +396,32 @@ export default function DoctorProfileForm() {
             </div>
           </SectionCard>
 
-          {/* 4. Document Uploads */}
+          {/* 4. Bank Account Details */}
+          <SectionCard title="Bank Account Details" icon={CreditCard} description="Your bank account information for receiving patient consultation payments.">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="md:col-span-2 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                <p className="text-sm text-amber-700 font-medium flex items-center gap-2">
+                  <Building2 size={16} />
+                  These details will be shown to patients for bank transfer payments. Keep them accurate.
+                </p>
+              </div>
+              <div>
+                <Label>Bank Name <span className="text-xs text-slate-300 font-normal">(Optional)</span></Label>
+                <Input name="bankName" value={formData.bankName} onChange={handleInputChange} placeholder="e.g. HBL, Meezan, UBL" />
+              </div>
+              <div>
+                <Label>Account Holder Name <span className="text-xs text-slate-300 font-normal">(Optional)</span></Label>
+                <Input name="accountHolderName" value={formData.accountHolderName} onChange={handleInputChange} placeholder="e.g. Dr. Ahmed Ali" />
+              </div>
+              <div className="md:col-span-2">
+                <Label>Account Number / IBAN <span className="text-xs text-slate-300 font-normal">(Optional)</span></Label>
+                <Input name="accountNumber" value={formData.accountNumber} onChange={handleInputChange} placeholder="e.g. PK36SCBL0000001123456702" />
+                <p className="text-xs text-slate-400 mt-1.5">Enter your full IBAN or account number used for receiving payments.</p>
+              </div>
+            </div>
+          </SectionCard>
+
+          {/* 5. Document Uploads */}
           <SectionCard title="Profile & Documents" icon={FileText} description="Upload your profile photo and medical credentials for verification.">
             <div className="space-y-6">
               

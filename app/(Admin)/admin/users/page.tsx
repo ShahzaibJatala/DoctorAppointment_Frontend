@@ -1,13 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  LayoutDashboard,
   Users,
-  Stethoscope,
-  Calendar,
-  Star,
-  Settings,
   Search,
   Bell,
   Filter,
@@ -18,17 +13,17 @@ import {
   Download,
   Trash2,
   Eye,
-  Mail,
   CalendarDays,
   MoreHorizontal,
-  FileText,
   Activity,
   X,
   ChevronLeft,
   ChevronRight,
-  Lock
+  Lock,
+  Loader2
 } from 'lucide-react';
 import DashboardShell from '@/components/layouts/DashboardShell';
+import { getToken } from '@/app/actions/token';
 
 // --- Types ---
 type UserStatus = 'Active' | 'Inactive' | 'Blocked';
@@ -46,72 +41,7 @@ interface User {
   avatar: string;
 }
 
-// --- Mock Data ---
-const usersData: User[] = [
-  {
-    id: '1',
-    name: 'Sarah Johnson',
-    email: 'sarah.j@example.com',
-    phone: '+1 (555) 123-4567',
-    role: 'Patient',
-    joinedDate: 'Jan 15, 2023',
-    status: 'Active',
-    totalAppointments: 12,
-    lastActive: '2 hours ago',
-    avatar: 'https://i.pravatar.cc/150?u=sarah'
-  },
-  {
-    id: '2',
-    name: 'Michael Chen',
-    email: 'm.chen@example.com',
-    phone: '+1 (555) 987-6543',
-    role: 'VIP Patient',
-    joinedDate: 'Mar 10, 2023',
-    status: 'Active',
-    totalAppointments: 28,
-    lastActive: '1 day ago',
-    avatar: 'https://i.pravatar.cc/150?u=michael'
-  },
-  {
-    id: '3',
-    name: 'Emma Davis',
-    email: 'emma.davis@example.com',
-    phone: '+1 (555) 456-7890',
-    role: 'Patient',
-    joinedDate: 'Dec 05, 2023',
-    status: 'Inactive',
-    totalAppointments: 1,
-    lastActive: '3 months ago',
-    avatar: 'https://i.pravatar.cc/150?u=emma'
-  },
-  {
-    id: '4',
-    name: 'Robert Wilson',
-    email: 'r.wilson@bad-actor.com',
-    phone: '+1 (555) 000-1111',
-    role: 'Patient',
-    joinedDate: 'Oct 01, 2024',
-    status: 'Blocked',
-    totalAppointments: 0,
-    lastActive: 'Never',
-    avatar: 'https://i.pravatar.cc/150?u=robert'
-  },
-  {
-    id: '5',
-    name: 'Linda Martinez',
-    email: 'linda.m@example.com',
-    phone: '+1 (555) 222-3333',
-    role: 'Patient',
-    joinedDate: 'Feb 14, 2024',
-    status: 'Active',
-    totalAppointments: 5,
-    lastActive: '5 mins ago',
-    avatar: 'https://i.pravatar.cc/150?u=linda'
-  }
-];
-
 // --- Components ---
-
 const StatusBadge = ({ status }: { status: UserStatus }) => {
   const styles = {
     Active: 'bg-green-50 text-green-700 border-green-200',
@@ -125,7 +55,7 @@ const StatusBadge = ({ status }: { status: UserStatus }) => {
     Blocked: Lock,
   };
 
-  const Icon = icons[status];
+  const Icon = icons[status] || CheckCircle;
 
   return (
     <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border ${styles[status]}`}>
@@ -149,10 +79,39 @@ const StatsCard = ({ label, value, icon: Icon, trend, color }: { label: string, 
 );
 
 export default function AdminUsers() {
+  const [usersData, setUsersData] = useState<User[]>([]);
   const [activeTab, setActiveTab] = useState<'All' | 'Active' | 'Blocked'>('All');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchUsers = async () => {
+    try {
+      setIsLoading(true);
+      const token = await getToken();
+      if (!token) return;
+      const cleanToken = token.replace(/"/g, '').trim();
+      const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL;
+      const res = await fetch(`${serverUrl}/admin/users`, {
+        headers: {
+          'Authorization': `Bearer ${cleanToken}`
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUsersData(data);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
 
   // Filter Logic
   const filteredUsers = usersData.filter(user => {
@@ -183,7 +142,7 @@ export default function AdminUsers() {
     total: usersData.length,
     active: usersData.filter(u => u.status === 'Active').length,
     blocked: usersData.filter(u => u.status === 'Blocked').length,
-    new: 12 // Mock
+    new: usersData.filter(u => u.joinedDate !== 'N/A').length // Simulated
   };
 
   return (
@@ -208,197 +167,205 @@ export default function AdminUsers() {
         </header>
 
         <div className="p-6 max-w-[1600px] mx-auto space-y-6">
-          
-          {/* Stats Cards */}
-          <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatsCard label="Total Users" value={stats.total.toString()} icon={Users} trend="+12% this month" color="bg-blue-600 text-blue-600" />
-            <StatsCard label="Active Users" value={stats.active.toString()} icon={CheckCircle} color="bg-green-600 text-green-600" />
-            <StatsCard label="Blocked Users" value={stats.blocked.toString()} icon={ShieldAlert} trend="-2% vs last month" color="bg-red-600 text-red-600" />
-            <StatsCard label="New This Month" value={stats.new.toString()} icon={CalendarDays} color="bg-teal-600 text-teal-600" />
-          </section>
-
-          {/* Controls Bar */}
-          <div className="flex flex-col md:flex-row justify-between gap-4 items-center bg-white p-2 rounded-xl border border-slate-100 shadow-sm">
-             {/* Tabs */}
-             <div className="flex bg-slate-100 p-1 rounded-lg self-start w-full md:w-auto">
-               {(['All', 'Active', 'Blocked'] as const).map(tab => (
-                 <button
-                   key={tab}
-                   onClick={() => setActiveTab(tab)}
-                   className={`flex-1 md:flex-none px-6 py-2 text-sm font-medium rounded-md transition-all ${
-                     activeTab === tab ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                   }`}
-                 >
-                   {tab}
-                 </button>
-               ))}
-             </div>
-
-             {/* Bulk Actions & Export */}
-             <div className="flex gap-2 w-full md:w-auto justify-end">
-                {selectedIds.length > 0 && (
-                  <button className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 border border-red-100 rounded-lg text-sm font-medium hover:bg-red-100 transition-colors animate-in fade-in">
-                    <Trash2 size={16} /> Delete ({selectedIds.length})
-                  </button>
-                )}
-                <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors">
-                  <Download size={16} /> Export CSV
-                </button>
-                <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors md:hidden">
-                  <Filter size={16} />
-                </button>
-             </div>
-          </div>
-
-          {/* Users Table */}
-          <div className="bg-white border border-slate-100 rounded-xl shadow-sm overflow-hidden">
-            
-            {/* Desktop Table */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-left">
-                <thead className="bg-slate-50 border-b border-slate-100">
-                  <tr>
-                    <th className="px-6 py-4 w-10">
-                      <input 
-                        type="checkbox" 
-                        className="rounded border-slate-300 text-teal-600 focus:ring-teal-500 cursor-pointer" 
-                        onChange={handleSelectAll}
-                        checked={selectedIds.length === filteredUsers.length && filteredUsers.length > 0}
-                      />
-                    </th>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">User Info</th>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Role</th>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Joined</th>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Status</th>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase text-center">Appts.</th>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredUsers.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
-                        <div className="flex flex-col items-center">
-                           <Users className="w-12 h-12 text-slate-300 mb-2" />
-                           <p>No users found matching your filters.</p>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : filteredUsers.map((user) => (
-                    <tr key={user.id} className={`hover:bg-slate-50/50 transition-colors group ${selectedIds.includes(user.id) ? 'bg-teal-50/30' : ''}`}>
-                      <td className="px-6 py-4">
-                        <input 
-                          type="checkbox" 
-                          className="rounded border-slate-300 text-teal-600 focus:ring-teal-500 cursor-pointer"
-                          checked={selectedIds.includes(user.id)}
-                          onChange={() => handleSelectOne(user.id)}
-                        />
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <img src={user.avatar} alt="" className="w-10 h-10 rounded-full object-cover border border-slate-100" />
-                          <div>
-                            <p className="font-bold text-slate-800 text-sm">{user.name}</p>
-                            <p className="text-xs text-slate-500">{user.email}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`text-xs font-medium px-2 py-1 rounded-full ${user.role === 'VIP Patient' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600'}`}>
-                          {user.role}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-slate-600">
-                        {user.joinedDate}
-                      </td>
-                      <td className="px-6 py-4">
-                        <StatusBadge status={user.status} />
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <span className="text-sm font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded-md">
-                          {user.totalAppointments}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                           <button 
-                             onClick={() => setSelectedUser(user)}
-                             className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
-                             title="View Activity"
-                           >
-                             <Eye size={18} />
-                           </button>
-                           {user.status !== 'Blocked' ? (
-                             <button className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Block User">
-                               <Lock size={18} />
-                             </button>
-                           ) : (
-                             <button className="p-2 text-slate-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors" title="Unblock User">
-                               <CheckCircle size={18} />
-                             </button>
-                           )}
-                           <button className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete User">
-                             <Trash2 size={18} />
-                           </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center h-[350px]">
+              <Loader2 className="w-8 h-8 text-[#16BCC8] animate-spin mb-4" />
+              <p className="text-slate-500 font-medium">Loading patients directory...</p>
             </div>
+          ) : (
+            <>
+              {/* Stats Cards */}
+              <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <StatsCard label="Total Users" value={stats.total.toString()} icon={Users} trend="+10% this month" color="bg-blue-600 text-blue-600" />
+                <StatsCard label="Active Users" value={stats.active.toString()} icon={CheckCircle} color="bg-green-600 text-green-600" />
+                <StatsCard label="Blocked Users" value={stats.blocked.toString()} icon={ShieldAlert} trend="-0% vs last month" color="bg-red-600 text-red-600" />
+                <StatsCard label="New This Month" value={stats.new.toString()} icon={CalendarDays} color="bg-teal-600 text-teal-600" />
+              </section>
 
-            {/* Mobile Card View */}
-            <div className="md:hidden divide-y divide-slate-100">
-              {filteredUsers.map(user => (
-                <div key={user.id} className="p-4 bg-white space-y-4">
-                   <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                         <img src={user.avatar} alt="" className="w-12 h-12 rounded-full border border-slate-100" />
-                         <div>
-                            <h4 className="font-bold text-slate-800">{user.name}</h4>
-                            <p className="text-xs text-slate-500">{user.email}</p>
-                         </div>
-                      </div>
-                      <button onClick={() => setSelectedUser(user)} className="p-2 text-slate-400">
-                        <MoreHorizontal size={20} />
-                      </button>
-                   </div>
-                   
-                   <div className="flex items-center justify-between text-sm">
-                      <StatusBadge status={user.status} />
-                      <span className="text-slate-500 text-xs">Joined {user.joinedDate}</span>
-                   </div>
+              {/* Controls Bar */}
+              <div className="flex flex-col md:flex-row justify-between gap-4 items-center bg-white p-2 rounded-xl border border-slate-100 shadow-sm">
+                 {/* Tabs */}
+                 <div className="flex bg-slate-100 p-1 rounded-lg self-start w-full md:w-auto">
+                   {(['All', 'Active', 'Blocked'] as const).map(tab => (
+                     <button
+                       key={tab}
+                       onClick={() => setActiveTab(tab)}
+                       className={`flex-1 md:flex-none px-6 py-2 text-sm font-medium rounded-md transition-all ${
+                         activeTab === tab ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                       }`}
+                     >
+                       {tab}
+                     </button>
+                   ))}
+                 </div>
 
-                   <div className="flex gap-2 pt-2">
-                      <button 
-                        onClick={() => setSelectedUser(user)}
-                        className="flex-1 py-2 bg-slate-50 text-slate-600 text-sm font-medium rounded-lg hover:bg-slate-100 border border-slate-200"
-                      >
-                        View Details
+                 {/* Bulk Actions & Export */}
+                 <div className="flex gap-2 w-full md:w-auto justify-end">
+                    {selectedIds.length > 0 && (
+                      <button className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 border border-red-100 rounded-lg text-sm font-medium hover:bg-red-100 transition-colors animate-in fade-in">
+                        <Trash2 size={16} /> Delete ({selectedIds.length})
                       </button>
-                      <button className="px-4 py-2 bg-white text-red-500 border border-red-200 rounded-lg hover:bg-red-50">
-                        <Lock size={18} />
-                      </button>
+                    )}
+                    <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors">
+                      <Download size={16} /> Export CSV
+                    </button>
+                    <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors md:hidden">
+                      <Filter size={16} />
+                    </button>
+                 </div>
+              </div>
+
+              {/* Users Table */}
+              <div className="bg-white border border-slate-100 rounded-xl shadow-sm overflow-hidden">
+                
+                {/* Desktop Table */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead className="bg-slate-50 border-b border-slate-100">
+                      <tr>
+                        <th className="px-6 py-4 w-10">
+                          <input 
+                            type="checkbox" 
+                            className="rounded border-slate-300 text-teal-600 focus:ring-teal-500 cursor-pointer" 
+                            onChange={handleSelectAll}
+                            checked={selectedIds.length === filteredUsers.length && filteredUsers.length > 0}
+                          />
+                        </th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">User Info</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Role</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Joined</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Status</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase text-center">Appts.</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredUsers.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
+                            <div className="flex flex-col items-center">
+                               <Users className="w-12 h-12 text-slate-300 mb-2" />
+                               <p>No users found matching your filters.</p>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : filteredUsers.map((user) => (
+                        <tr key={user.id} className={`hover:bg-slate-50/50 transition-colors group ${selectedIds.includes(user.id) ? 'bg-teal-50/30' : ''}`}>
+                          <td className="px-6 py-4">
+                            <input 
+                              type="checkbox" 
+                              className="rounded border-slate-300 text-teal-600 focus:ring-teal-500 cursor-pointer"
+                              checked={selectedIds.includes(user.id)}
+                              onChange={() => handleSelectOne(user.id)}
+                            />
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              <img src={user.avatar} alt="" className="w-10 h-10 rounded-full object-cover border border-slate-100" />
+                              <div>
+                                <p className="font-bold text-slate-800 text-sm">{user.name}</p>
+                                <p className="text-xs text-slate-500">{user.email}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={`text-xs font-medium px-2 py-1 rounded-full ${user.role === 'VIP Patient' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600'}`}>
+                              {user.role}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-slate-600">
+                            {user.joinedDate}
+                          </td>
+                          <td className="px-6 py-4">
+                            <StatusBadge status={user.status} />
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <span className="text-sm font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded-md">
+                              {user.totalAppointments}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                               <button 
+                                 onClick={() => setSelectedUser(user)}
+                                 className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
+                                 title="View Activity"
+                               >
+                                 <Eye size={18} />
+                               </button>
+                               {user.status !== 'Blocked' ? (
+                                 <button className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Block User">
+                                   <Lock size={18} />
+                                 </button>
+                               ) : (
+                                 <button className="p-2 text-slate-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors" title="Unblock User">
+                                   <CheckCircle size={18} />
+                                 </button>
+                               )}
+                               <button className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete User">
+                                 <Trash2 size={18} />
+                               </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile Card View */}
+                <div className="md:hidden divide-y divide-slate-100">
+                  {filteredUsers.map(user => (
+                    <div key={user.id} className="p-4 bg-white space-y-4">
+                       <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                             <img src={user.avatar} alt="" className="w-12 h-12 rounded-full border border-slate-100" />
+                             <div>
+                                <h4 className="font-bold text-slate-800">{user.name}</h4>
+                                <p className="text-xs text-slate-500">{user.email}</p>
+                             </div>
+                          </div>
+                          <button onClick={() => setSelectedUser(user)} className="p-2 text-slate-400">
+                            <MoreHorizontal size={20} />
+                          </button>
+                       </div>
+                       
+                       <div className="flex items-center justify-between text-sm">
+                          <StatusBadge status={user.status} />
+                          <span className="text-slate-500 text-xs">Joined {user.joinedDate}</span>
+                       </div>
+
+                       <div className="flex gap-2 pt-2">
+                          <button 
+                            onClick={() => setSelectedUser(user)}
+                            className="flex-1 py-2 bg-slate-50 text-slate-600 text-sm font-medium rounded-lg hover:bg-slate-100 border border-slate-200"
+                          >
+                            View Details
+                          </button>
+                          <button className="px-4 py-2 bg-white text-red-500 border border-red-200 rounded-lg hover:bg-red-50">
+                            <Lock size={18} />
+                          </button>
+                       </div>
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Pagination Footer */}
+                <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
+                   <span className="text-xs text-slate-500">Showing 1-10 of {filteredUsers.length} users</span>
+                   <div className="flex gap-2">
+                     <button className="p-1 rounded-md hover:bg-white border border-transparent hover:border-slate-200 text-slate-400 hover:text-slate-600 disabled:opacity-50" disabled>
+                       <ChevronLeft size={16} />
+                     </button>
+                     <button className="p-1 rounded-md hover:bg-white border border-transparent hover:border-slate-200 text-slate-400 hover:text-slate-600">
+                       <ChevronRight size={16} />
+                     </button>
                    </div>
                 </div>
-              ))}
-            </div>
-            
-            {/* Pagination Footer (Visual) */}
-            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
-               <span className="text-xs text-slate-500">Showing 1-5 of {filteredUsers.length} users</span>
-               <div className="flex gap-2">
-                 <button className="p-1 rounded-md hover:bg-white border border-transparent hover:border-slate-200 text-slate-400 hover:text-slate-600 disabled:opacity-50" disabled>
-                   <ChevronLeft size={16} />
-                 </button>
-                 <button className="p-1 rounded-md hover:bg-white border border-transparent hover:border-slate-200 text-slate-400 hover:text-slate-600">
-                   <ChevronRight size={16} />
-                 </button>
-               </div>
-            </div>
 
-          </div>
+              </div>
+            </>
+          )}
         </div>
 
       {/* --- User Details / Activity Modal --- */}
@@ -462,18 +429,13 @@ export default function AdminUsers() {
                    <div className="space-y-4 relative pl-4 border-l border-slate-200 ml-2">
                       <div className="relative">
                         <div className="absolute -left-[21px] top-1 w-3 h-3 bg-teal-500 rounded-full border-2 border-white"></div>
-                        <p className="text-sm font-medium text-slate-800">Booked appointment with Dr. Smith</p>
-                        <p className="text-xs text-slate-400">2 hours ago</p>
+                        <p className="text-sm font-medium text-slate-800">Booked appointment</p>
+                        <p className="text-xs text-slate-400">Recently</p>
                       </div>
                       <div className="relative">
                         <div className="absolute -left-[21px] top-1 w-3 h-3 bg-slate-300 rounded-full border-2 border-white"></div>
                         <p className="text-sm font-medium text-slate-800">Updated profile information</p>
                         <p className="text-xs text-slate-400">Yesterday</p>
-                      </div>
-                      <div className="relative">
-                        <div className="absolute -left-[21px] top-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
-                        <p className="text-sm font-medium text-slate-800">Completed video consultation</p>
-                        <p className="text-xs text-slate-400">Oct 24, 2024</p>
                       </div>
                    </div>
                 </div>

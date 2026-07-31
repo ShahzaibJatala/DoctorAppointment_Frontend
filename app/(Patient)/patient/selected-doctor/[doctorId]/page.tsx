@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   MapPin, Star, Clock, Video, ShieldCheck, Stethoscope,
   GraduationCap, Languages, Share2, Heart, ChevronRight,
@@ -11,30 +11,13 @@ import axios from 'axios';
 import { useParams } from 'next/navigation';
 import { getToken } from '@/app/actions/token';
 
-
 // ─── Types ────────────────────────────────────────────────────────────────────
 type BookingStep = 'datetime' | 'payment' | 'confirmed';
 type BookingType = 'Clinic' | 'Video';
 type TimePeriod = 'Morning' | 'Afternoon' | 'Evening';
 
 type TimeSlot = { time: string; period: TimePeriod };
-type DayOption = { label: string; dayName: string; date: Date; display: string };
-
-// ─── Static mock data (replace/extend with real API data as needed) ────────────
-const doctor = {
-  name: "Dr. Sarah Jenkins",
-  specialty: "Senior Cardiologist",
-  image: "https://i.pravatar.cc/300?u=doctor_sarah",
-  hospital: "Heart & Vascular Institute",
-  experience: "15+ Years",
-  patients: "5,000+",
-  rating: 4.9,
-  reviewCount: 428,
-  about: "Dr. Sarah Jenkins is a board-certified Cardiologist with over 15 years of experience in interventional cardiology. She specialises in preventing, diagnosing, and treating cardiovascular diseases.",
-  education: ["MD - Harvard Medical School", "Residency - Johns Hopkins Hospital", "Fellowship - Mayo Clinic"],
-  languages: ["English", "Spanish"],
-  consultationFee: { Clinic: 120, Video: 80 },
-};
+type DayOption = { label: string; dayName: string; fullDayName: string; date: Date; display: string };
 
 const services = [
   "Echocardiography", "Cardiac Catheterization", "Angioplasty",
@@ -42,23 +25,15 @@ const services = [
 ];
 
 const reviews = [
-  { id: '1', user: 'Michael R.', rating: 5, date: '2 days ago', comment: 'Dr. Jenkins was incredibly thorough and kind. She took the time to explain everything clearly.' },
+  { id: '1', user: 'Michael R.', rating: 5, date: '2 days ago', comment: 'Very thorough and kind. Took the time to explain everything clearly.' },
   { id: '2', user: 'Emily W.', rating: 5, date: '1 week ago', comment: 'Excellent experience. The clinic is modern and the staff is friendly. Highly recommended.' },
   { id: '3', user: 'David K.', rating: 4, date: '3 weeks ago', comment: 'Great doctor, but the wait time was a bit longer than expected.' },
-];
-
-const timeSlots: TimeSlot[] = [
-  { time: '09:00 AM', period: 'Morning' }, { time: '09:30 AM', period: 'Morning' },
-  { time: '10:00 AM', period: 'Morning' }, { time: '10:30 AM', period: 'Morning' },
-  { time: '11:00 AM', period: 'Morning' }, { time: '02:00 PM', period: 'Afternoon' },
-  { time: '02:30 PM', period: 'Afternoon' }, { time: '03:00 PM', period: 'Afternoon' },
-  { time: '04:00 PM', period: 'Afternoon' }, { time: '06:00 PM', period: 'Evening' },
-  { time: '06:30 PM', period: 'Evening' },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function getNextSevenDays(): DayOption[] {
   const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const dayNamesFull = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const today = new Date();
   return Array.from({ length: 7 }, (_, i) => {
@@ -67,6 +42,7 @@ function getNextSevenDays(): DayOption[] {
     return {
       label: i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : days[d.getDay()],
       dayName: days[d.getDay()],
+      fullDayName: dayNamesFull[d.getDay()],
       date: d,
       display: `${d.getDate()} ${months[d.getMonth()]}`,
     };
@@ -121,28 +97,35 @@ const StepIndicator = ({ step }: { step: BookingStep }) => {
 };
 
 const SlotGroup = ({
-  title, slots, selected, onSelect
+  title, slots, selected, onSelect, bookedTimes
 }: {
-  title: string; slots: TimeSlot[]; selected: string | null; onSelect: (t: string) => void;
+  title: string; slots: TimeSlot[]; selected: string | null; onSelect: (t: string) => void; bookedTimes: string[];
 }) => {
   if (slots.length === 0) return null;
   return (
     <div className="mb-4">
       <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{title}</p>
       <div className="grid grid-cols-3 gap-2">
-        {slots.map((slot, i) => (
-          <button
-            key={i}
-            onClick={() => onSelect(slot.time)}
-            className={`text-xs font-semibold py-2 rounded-lg border transition-all ${
-              selected === slot.time
-                ? 'bg-teal-600 border-teal-600 text-white shadow-sm'
-                : 'bg-white border-slate-200 text-slate-600 hover:border-teal-400 hover:text-teal-700'
-            }`}
-          >
-            {slot.time}
-          </button>
-        ))}
+        {slots.map((slot, i) => {
+          const isBooked = bookedTimes.includes(slot.time);
+          return (
+            <button
+              key={i}
+              type="button"
+              disabled={isBooked}
+              onClick={() => onSelect(slot.time)}
+              className={`text-xs font-semibold py-2 rounded-lg border transition-all ${
+                isBooked
+                  ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60 line-through'
+                  : selected === slot.time
+                  ? 'bg-teal-600 border-teal-600 text-white shadow-sm'
+                  : 'bg-white border-slate-200 text-slate-600 hover:border-teal-400 hover:text-teal-700'
+              }`}
+            >
+              {slot.time}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -153,6 +136,11 @@ export default function DoctorProfile() {
   const params = useParams();
   const doctorId = params.doctorId as string;
   const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL;
+
+  // Real data state
+  const [doctor, setDoctor] = useState<any>(null);
+  const [bookedAppointments, setBookedAppointments] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Booking flow state
   const [step, setStep] = useState<BookingStep>('datetime');
@@ -174,14 +162,121 @@ export default function DoctorProfile() {
   // Favourite (UI only)
   const [isFav, setIsFav] = useState(false);
 
+  // Fetch doctor data and booked appointments
+  useEffect(() => {
+    async function fetchDoctorAndAppointments() {
+      try {
+        const token = await getToken();
+        const headers: any = { 'Content-Type': 'application/json' };
+        let cleanToken = '';
+        if (token) {
+          cleanToken = token.replace(/"/g, '').trim();
+          headers['Authorization'] = `Bearer ${cleanToken}`;
+        }
+
+        // 1. Fetch all doctors and find matching doctor
+        const response = await axios.get(`${serverUrl}/patient/allDoctors`, { headers });
+        const matchingDoc = response.data.find((d: any) => d._id === doctorId);
+        setDoctor(matchingDoc);
+
+        // 2. Fetch booked appointments if logged in
+        if (cleanToken && matchingDoc) {
+          const bookedRes = await axios.get(`${serverUrl}/patient/doctor-appointments/${doctorId}`, {
+            headers: { Authorization: `Bearer ${cleanToken}` }
+          });
+          setBookedAppointments(bookedRes.data);
+        }
+      } catch (error) {
+        console.error('Error fetching doctor details:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchDoctorAndAppointments();
+  }, [doctorId, serverUrl]);
+
   // ── Dynamic dates (next 7 days) ──
   const days = useMemo(() => getNextSevenDays(), []);
-  const fee = doctor.consultationFee[bookingType];
+
+  const fee = useMemo(() => {
+    if (!doctor) return 100;
+    const dbFee = doctor.consultationFee || 100;
+    return bookingType === 'Clinic' ? dbFee : Math.round(dbFee * 0.8);
+  }, [doctor, bookingType]);
+
+  // Retrieve already booked appointment slot strings for the selected date
+  const bookedTimesForSelectedDay = useMemo(() => {
+    const selectedDate = days[selectedDayIdx].date;
+    return bookedAppointments
+      .filter((app) => {
+        const appDate = new Date(app.startTime);
+        return (
+          appDate.getDate() === selectedDate.getDate() &&
+          appDate.getMonth() === selectedDate.getMonth() &&
+          appDate.getFullYear() === selectedDate.getFullYear() &&
+          app.status !== 'cancelled'
+        );
+      })
+      .map((app) => {
+        const d = new Date(app.startTime);
+        let hours = d.getHours();
+        const minutes = d.getMinutes();
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12;
+        hours = hours ? hours : 12;
+        const minutesStr = minutes < 10 ? '0' + minutes : minutes;
+        const hoursStr = hours < 10 ? '0' + hours : hours;
+        return `${hoursStr}:${minutesStr} ${ampm}`;
+      });
+  }, [bookedAppointments, selectedDayIdx, days]);
+
+  // Dynamically build today's slots based on the doctor's availability list
+  const timeSlotsForSelectedDay = useMemo(() => {
+    if (!doctor || !doctor.availability) return [];
+    const selectedDayName = days[selectedDayIdx].fullDayName;
+    const slotsForDay = doctor.availability.filter(
+      (slot: any) => slot.day === selectedDayName && slot.isAvailable
+    );
+
+    const format12h = (t24: string) => {
+      const [hStr, mStr] = t24.split(':');
+      let h = parseInt(hStr);
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      h = h % 12;
+      h = h ? h : 12;
+      return `${String(h).padStart(2, '0')}:${mStr} ${ampm}`;
+    };
+
+    const toMin = (t: string) => {
+      const [h, m] = t.split(':').map(Number);
+      return h * 60 + m;
+    };
+
+    const sorted = [...slotsForDay].sort((a, b) => toMin(a.startTime) - toMin(b.startTime));
+
+    return sorted.map((s: any) => {
+      const time12 = format12h(s.startTime);
+      const [hStr] = s.startTime.split(':');
+      const hour = parseInt(hStr);
+      
+      let period: TimePeriod = 'Morning';
+      if (hour >= 12 && hour < 17) {
+        period = 'Afternoon';
+      } else if (hour >= 17) {
+        period = 'Evening';
+      }
+
+      return {
+        time: time12,
+        period,
+      };
+    });
+  }, [doctor, selectedDayIdx, days]);
 
   // ── Slot groups ──
-  const morning = timeSlots.filter(s => s.period === 'Morning');
-  const afternoon = timeSlots.filter(s => s.period === 'Afternoon');
-  const evening = timeSlots.filter(s => s.period === 'Evening');
+  const morning = useMemo(() => timeSlotsForSelectedDay.filter(s => s.period === 'Morning'), [timeSlotsForSelectedDay]);
+  const afternoon = useMemo(() => timeSlotsForSelectedDay.filter(s => s.period === 'Afternoon'), [timeSlotsForSelectedDay]);
+  const evening = useMemo(() => timeSlotsForSelectedDay.filter(s => s.period === 'Evening'), [timeSlotsForSelectedDay]);
 
   // ── Handlers ──
   const handleProceedToPayment = () => {
@@ -307,9 +402,17 @@ export default function DoctorProfile() {
           <h4 className="font-bold text-slate-800 text-sm mb-3 flex items-center gap-1.5">
             <Clock size={14} className="text-teal-600" /> Available Slots
           </h4>
-          <SlotGroup title="Morning" slots={morning} selected={selectedTime} onSelect={setSelectedTime} />
-          <SlotGroup title="Afternoon" slots={afternoon} selected={selectedTime} onSelect={setSelectedTime} />
-          <SlotGroup title="Evening" slots={evening} selected={selectedTime} onSelect={setSelectedTime} />
+          {timeSlotsForSelectedDay.length === 0 ? (
+            <div className="text-center py-8 text-slate-400 text-sm bg-slate-50 border border-slate-100/70 rounded-xl italic">
+              Doctor has no availability shifts configured for this day.
+            </div>
+          ) : (
+            <>
+              <SlotGroup title="Morning" slots={morning} selected={selectedTime} onSelect={setSelectedTime} bookedTimes={bookedTimesForSelectedDay} />
+              <SlotGroup title="Afternoon" slots={afternoon} selected={selectedTime} onSelect={setSelectedTime} bookedTimes={bookedTimesForSelectedDay} />
+              <SlotGroup title="Evening" slots={evening} selected={selectedTime} onSelect={setSelectedTime} bookedTimes={bookedTimesForSelectedDay} />
+            </>
+          )}
         </div>
 
         {/* Selected summary */}
@@ -352,7 +455,7 @@ export default function DoctorProfile() {
           <div className="space-y-1.5 text-sm">
             <div className="flex justify-between">
               <span className="text-slate-500">Doctor</span>
-              <span className="font-semibold text-slate-800">{doctor.name}</span>
+              <span className="font-semibold text-slate-800">{doctor?.fullName}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500">Date</span>
@@ -484,7 +587,7 @@ export default function DoctorProfile() {
         <div className="bg-teal-50 border border-teal-100 rounded-2xl p-4 mb-6 text-left space-y-2 text-sm">
           <div className="flex items-center gap-3">
             <User size={15} className="text-teal-600 shrink-0" />
-            <span className="text-slate-700"><span className="font-semibold">Doctor:</span> {doctor.name}</span>
+            <span className="text-slate-700"><span className="font-semibold">Doctor:</span> {doctor?.fullName}</span>
           </div>
           <div className="flex items-center gap-3">
             <Calendar size={15} className="text-teal-600 shrink-0" />
@@ -516,6 +619,28 @@ export default function DoctorProfile() {
     );
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center py-40">
+        <Loader2 className="w-10 h-10 text-[#16BCC8] animate-spin mb-4" />
+        <p className="text-slate-500 font-medium font-sans">Loading doctor profile...</p>
+      </div>
+    );
+  }
+
+  if (!doctor) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center py-40">
+        <div className="p-8 bg-white rounded-2xl border border-slate-100 shadow-sm text-center max-w-sm">
+          <p className="text-slate-500 font-medium mb-4">Doctor profile details not found.</p>
+          <a href="/patient/findDoctors" className="px-6 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-semibold text-sm transition-all">
+            Return to Doctor List
+          </a>
+        </div>
+      </div>
+    );
+  }
+
   // ─── Page Layout ─────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-16">
@@ -523,11 +648,11 @@ export default function DoctorProfile() {
       {/* Breadcrumb */}
       <nav className="bg-white border-b border-slate-200 px-4 py-3">
         <div className="max-w-6xl mx-auto flex items-center gap-2 text-sm text-slate-500">
-          <span className="hover:text-teal-600 cursor-pointer">Home</span>
+          <a href="/patient/dashboard" className="hover:text-teal-600 cursor-pointer">Dashboard</a>
           <ChevronRight size={14} />
-          <span className="hover:text-teal-600 cursor-pointer">Doctors</span>
+          <a href="/patient/findDoctors" className="hover:text-teal-600 cursor-pointer">Doctors</a>
           <ChevronRight size={14} />
-          <span className="text-teal-600 font-semibold">{doctor.name}</span>
+          <span className="text-teal-600 font-semibold">{doctor.fullName}</span>
         </div>
       </nav>
 
@@ -551,31 +676,31 @@ export default function DoctorProfile() {
             </div>
 
             <div className="flex flex-col sm:flex-row gap-6">
-              <div className="relative self-start">
-                <img src={doctor.image} alt={doctor.name} className="w-28 h-28 rounded-2xl object-cover border border-slate-100 shadow" />
+              <div className="relative self-start shrink-0">
+                <img
+                  src={doctor.profilePictureUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.fullName)}&background=0D9488&color=fff`}
+                  alt=""
+                  className="w-28 h-28 rounded-2xl object-cover border border-slate-100 shadow"
+                />
                 <span className="absolute -bottom-2 -right-2 bg-white p-0.5 rounded-full">
                   <span className="block w-4 h-4 bg-green-500 rounded-full border-2 border-white" title="Online" />
                 </span>
               </div>
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-0.5">
-                  <h1 className="text-2xl font-extrabold text-slate-900">{doctor.name}</h1>
+                  <h1 className="text-2xl font-extrabold text-slate-900">{doctor.fullName}</h1>
                   <ShieldCheck className="text-teal-500" size={20} />
                 </div>
-                <p className="text-slate-500 font-medium mb-3">{doctor.specialty} · {doctor.hospital}</p>
+                <p className="text-slate-500 font-medium mb-3">{doctor.specialization} · {doctor.clinicName || 'Clinic Desk'}</p>
                 <div className="flex flex-wrap gap-3">
                   <div className="flex items-center gap-1.5 text-sm text-slate-600 bg-slate-50 px-3 py-1.5 rounded-lg">
                     <Star size={15} className="text-yellow-500 fill-yellow-500" />
-                    <span className="font-bold">{doctor.rating}</span>
-                    <span className="text-slate-400">({doctor.reviewCount})</span>
+                    <span className="font-bold">{doctor.rating || 4.9}</span>
+                    <span className="text-slate-400">({doctor.reviewCount || 120})</span>
                   </div>
                   <div className="flex items-center gap-1.5 text-sm text-slate-600 bg-slate-50 px-3 py-1.5 rounded-lg">
                     <BriefcaseIcon className="text-teal-600" />
-                    <span>{doctor.experience} Exp.</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-sm text-slate-600 bg-slate-50 px-3 py-1.5 rounded-lg">
-                    <User size={15} className="text-teal-600" />
-                    <span>{doctor.patients} Patients</span>
+                    <span>{doctor.experienceYears || 1} Years Exp.</span>
                   </div>
                 </div>
               </div>
@@ -585,19 +710,21 @@ export default function DoctorProfile() {
           {/* About */}
           <section className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
             <SectionTitle title="About Doctor" />
-            <p className="text-slate-600 leading-relaxed text-sm mb-6">{doctor.about}</p>
+            <p className="text-slate-600 leading-relaxed text-sm mb-6">{doctor.Bio || `Dr. ${doctor.fullName} is a dedicated ${doctor.specialization} specialist committed to providing exceptional, patient-centered healthcare. Specializes in custom treatment plans and advanced clinical care.`}</p>
             <div className="grid md:grid-cols-2 gap-6">
               <div>
                 <h3 className="font-semibold text-slate-800 mb-3 flex items-center gap-2">
-                  <GraduationCap size={18} className="text-teal-600" /> Education
+                  <GraduationCap size={18} className="text-teal-600" /> Professional Details
                 </h3>
                 <ul className="space-y-2">
-                  {doctor.education.map((edu, idx) => (
-                    <li key={idx} className="text-sm text-slate-600 flex items-start gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-teal-400 mt-1.5 shrink-0" />
-                      {edu}
-                    </li>
-                  ))}
+                  <li className="text-sm text-slate-600 flex items-start gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-teal-400 mt-1.5 shrink-0" />
+                    License Number: {doctor.LicenseNumber || 'N/A'}
+                  </li>
+                  <li className="text-sm text-slate-600 flex items-start gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-teal-400 mt-1.5 shrink-0" />
+                    Medical Board: {doctor.medicalBoard || 'Provincial Medical Council'}
+                  </li>
                 </ul>
               </div>
               <div>
@@ -605,9 +732,13 @@ export default function DoctorProfile() {
                   <Languages size={18} className="text-teal-600" /> Languages Spoken
                 </h3>
                 <div className="flex flex-wrap gap-2">
-                  {doctor.languages.map((lang, idx) => (
-                    <span key={idx} className="px-3 py-1 bg-slate-100 text-slate-600 text-sm rounded-lg">{lang}</span>
-                  ))}
+                  {doctor.language && doctor.language.length > 0 ? (
+                    doctor.language.map((lang: string, idx: number) => (
+                      <span key={idx} className="px-3 py-1 bg-slate-100 text-slate-600 text-sm rounded-lg">{lang}</span>
+                    ))
+                  ) : (
+                    <span className="px-3 py-1 bg-slate-100 text-slate-600 text-sm rounded-lg">English</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -636,15 +767,15 @@ export default function DoctorProfile() {
                 <div className="flex items-start gap-3">
                   <MapPin className="text-teal-600 mt-1 shrink-0" size={20} />
                   <div>
-                    <h4 className="font-bold text-slate-800">Heart & Vascular Institute</h4>
-                    <p className="text-sm text-slate-500 mt-1">123 Medical Center Dr, Suite 400<br />San Francisco, CA 94117</p>
+                    <h4 className="font-bold text-slate-800">{doctor.clinicName || 'Clinic Desk'}</h4>
+                    <p className="text-sm text-slate-500 mt-1">{doctor.clinicAddress || 'Hospital Address'}{doctor.city ? `, ${doctor.city}` : ''}{doctor.province ? `, ${doctor.province}` : ''}</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
                   <Clock className="text-teal-600 mt-1 shrink-0" size={20} />
                   <div>
-                    <h4 className="font-bold text-slate-800">Clinic Timings</h4>
-                    <p className="text-sm text-slate-500 mt-1">Mon – Fri: 09:00 AM – 06:00 PM</p>
+                    <h4 className="font-bold text-slate-800">Clinic Status</h4>
+                    <p className="text-sm text-slate-500 mt-1">Available for Walk-Ins & Online Consultations</p>
                   </div>
                 </div>
               </div>

@@ -2,7 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import {
-  Users, UserPlus, Search, Phone, Mail, KeyRound, Loader2, X, PlusCircle, UserCheck, ShieldCheck
+  Users, UserPlus, Search, Phone, Mail, KeyRound, Loader2, X, PlusCircle, UserCheck, ShieldCheck, Eye, EyeOff,
+  ShieldOff, Trash2, AlertTriangle
 } from 'lucide-react';
 import axios from 'axios';
 import { getToken } from '@/app/actions/token';
@@ -14,18 +15,22 @@ interface CompounderItem {
   email: string;
   phoneNumber: string;
   createdAt: string;
+  status?: string;
 }
 
 export default function DoctorCompounders() {
   const [compounders, setCompounders] = useState<CompounderItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<CompounderItem | null>(null);
 
   // Form fields
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -55,6 +60,10 @@ export default function DoctorCompounders() {
     e.preventDefault();
     if (!fullName || !email || !password || !phoneNumber) {
       setErrorMsg('Please fill all fields.');
+      return;
+    }
+    if (phoneNumber.length !== 11) {
+      setErrorMsg('Phone number must be exactly 11 digits.');
       return;
     }
     setIsSubmitting(true);
@@ -91,7 +100,43 @@ export default function DoctorCompounders() {
     }
   };
 
+  const handleSuspend = async (comp: CompounderItem) => {
+    setActionLoading(comp._id + '-suspend');
+    try {
+      const token = await getToken();
+      if (!token) return;
+      const cleanToken = token.replace(/"/g, '').trim();
+      await axios.post(`${serverUrl}/compounder/suspend/${comp._id}`, {}, {
+        headers: { Authorization: `Bearer ${cleanToken}` }
+      });
+      await fetchCompounders();
+    } catch (err) {
+      console.error('Suspend failed', err);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDelete = async (comp: CompounderItem) => {
+    setConfirmDelete(null);
+    setActionLoading(comp._id + '-delete');
+    try {
+      const token = await getToken();
+      if (!token) return;
+      const cleanToken = token.replace(/"/g, '').trim();
+      await axios.delete(`${serverUrl}/compounder/${comp._id}`, {
+        headers: { Authorization: `Bearer ${cleanToken}` }
+      });
+      await fetchCompounders();
+    } catch (err) {
+      console.error('Delete failed', err);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   return (
+    <>
     <DashboardShell role="doctor" activeHref="/doctor/compounders" showHealthTip={false}>
       <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl border-b border-slate-100 px-4 sm:px-8 py-5 flex items-center justify-between">
         <div>
@@ -143,9 +188,40 @@ export default function DoctorCompounders() {
                         </div>
                       </div>
                     </div>
-                    <span className="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1 bg-green-50 text-green-700 rounded-full border border-green-100">
-                      <ShieldCheck size={12} /> Active Desk Access
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-flex items-center gap-1 text-xs font-semibold px-3 py-1 rounded-full border ${
+                        comp.status === 'Suspended'
+                          ? 'bg-red-50 text-red-700 border-red-100'
+                          : 'bg-green-50 text-green-700 border-green-100'
+                      }`}>
+                        <ShieldCheck size={12} />
+                        {comp.status === 'Suspended' ? 'Suspended' : 'Active'}
+                      </span>
+                      <button
+                        onClick={() => handleSuspend(comp)}
+                        disabled={actionLoading === comp._id + '-suspend'}
+                        title={comp.status === 'Suspended' ? 'Reactivate' : 'Suspend'}
+                        className={`p-2 rounded-lg text-xs font-semibold transition-all ${
+                          comp.status === 'Suspended'
+                            ? 'bg-green-50 text-green-700 hover:bg-green-100'
+                            : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+                        }`}
+                      >
+                        {actionLoading === comp._id + '-suspend'
+                          ? <Loader2 size={14} className="animate-spin" />
+                          : <ShieldOff size={14} />}
+                      </button>
+                      <button
+                        onClick={() => setConfirmDelete(comp)}
+                        disabled={actionLoading === comp._id + '-delete'}
+                        title="Delete compounder"
+                        className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-all"
+                      >
+                        {actionLoading === comp._id + '-delete'
+                          ? <Loader2 size={14} className="animate-spin" />
+                          : <Trash2 size={14} />}
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -199,12 +275,19 @@ export default function DoctorCompounders() {
                   <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300 w-4 h-4" />
                   <input
                     required
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     placeholder="••••••••"
                     value={password}
                     onChange={e => setPassword(e.target.value)}
-                    className="pl-11 pr-4 py-3 w-full border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-50 transition-all"
+                    className="pl-11 pr-11 py-3 w-full border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-50 transition-all"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
                 </div>
               </div>
 
@@ -215,7 +298,12 @@ export default function DoctorCompounders() {
                   type="tel"
                   placeholder="e.g. 03211234567"
                   value={phoneNumber}
-                  onChange={e => setPhoneNumber(e.target.value)}
+                  onChange={e => {
+                    const val = e.target.value.replace(/\D/g, '');
+                    if (val.length <= 11) {
+                      setPhoneNumber(val);
+                    }
+                  }}
                   className="px-4 py-3 w-full border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-50 transition-all"
                 />
               </div>
@@ -248,5 +336,37 @@ export default function DoctorCompounders() {
         </div>
       )}
     </DashboardShell>
+
+      {/* Delete Confirmation Modal */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
+            <div className="p-6 text-center">
+              <div className="w-14 h-14 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <AlertTriangle size={24} className="text-red-500" />
+              </div>
+              <h3 className="font-bold text-slate-800 text-lg mb-2">Delete Compounder?</h3>
+              <p className="text-sm text-slate-500 mb-6">
+                Are you sure you want to permanently delete <strong>{confirmDelete.fullName}</strong>? This action cannot be undone.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setConfirmDelete(null)}
+                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold text-sm transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleDelete(confirmDelete)}
+                  className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-sm shadow-sm transition-all"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

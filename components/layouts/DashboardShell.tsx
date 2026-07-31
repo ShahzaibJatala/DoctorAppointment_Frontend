@@ -19,7 +19,8 @@ import {
   Sparkles,
   type LucideIcon,
 } from "lucide-react";
-import { removeToken } from "@/app/actions/token";
+import { removeToken, getToken } from "@/app/actions/token";
+import { jwtDecode } from "jwt-decode";
 
 type Role = "patient" | "doctor" | "admin" | "compounder";
 
@@ -96,6 +97,32 @@ export default function DashboardShell({
       document.body.style.overflow = "";
     };
   }, [sidebarOpen]);
+
+  useEffect(() => {
+    async function verifyRole() {
+      try {
+        const token = await getToken();
+        if (!token) {
+          router.push("/login");
+          return;
+        }
+        const cleanToken = token.replace(/"/g, '').trim();
+        const decoded = jwtDecode<{ role: string }>(cleanToken);
+        if (decoded.role !== role) {
+          console.warn(`Role mismatch: token role is '${decoded.role}', page role is '${role}'`);
+          if (decoded.role === 'patient' || decoded.role === 'doctor' || decoded.role === 'admin' || decoded.role === 'compounder') {
+            router.push(`/${decoded.role}/dashboard`);
+          } else {
+            router.push("/login");
+          }
+        }
+      } catch (err) {
+        console.error("Failed to verify role from token:", err);
+        router.push("/login");
+      }
+    }
+    verifyRole();
+  }, [role, router]);
 
   const handleLogout = () => {
     startTransition(async () => {

@@ -8,18 +8,16 @@ import {
   Video,
   Search,
   Filter,
-  MoreVertical,
   CalendarCheck,
   Bell,
-  ChevronRight,
   Plus,
   X,
   CheckCircle2,
   AlertCircle,
-  ArrowRight
 } from 'lucide-react';
 import DashboardShell from '@/components/layouts/DashboardShell';
 import { getToken } from '@/app/actions/token';
+import Image from 'next/image';
 
 // --- Types ---
 type AppointmentStatus = 'Confirmed' | 'Pending' | 'Completed' | 'Cancelled' | 'checked-in' | 'in-progress' | 'Upcoming';
@@ -35,6 +33,19 @@ interface Appointment {
   type: AppointmentType;
   status: AppointmentStatus;
   location?: string; // Optional for In-Clinic
+}
+
+interface AppointmentApiResponse {
+  id?: string;
+  _id?: string;
+  doctorName?: string;
+  specialty?: string;
+  avatar?: string;
+  date: string;
+  time: string;
+  type?: string;
+  status?: AppointmentStatus;
+  location?: string;
 }
 
 // --- Components ---
@@ -78,7 +89,7 @@ const EmptyState = () => (
     </div>
     <h3 className="text-lg font-bold text-slate-800">No appointments found</h3>
     <p className="text-slate-400 text-sm max-w-xs mt-2 mb-6">
-      You don't have any appointments in this category yet.
+      You don&apos;t have any appointments in this category yet.
     </p>
     <button className="flex items-center gap-2 bg-gradient-to-r from-[#16BCC8] to-[#0ea5a9] text-white px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 shadow-[0_2px_12px_rgba(22,188,200,0.3)] hover:shadow-[0_4px_20px_rgba(22,188,200,0.4)]">
       <Plus size={18} />
@@ -106,15 +117,15 @@ export default function MyAppointments() {
       });
       if (res.ok) {
         const data = await res.json();
-        const mapped = data.map((item: any) => ({
+        const mapped = data.map((item: AppointmentApiResponse) => ({
           id: item.id || item._id,
-          doctorName: item.doctorName,
-          specialty: item.specialty,
+          doctorName: item.doctorName || 'Doctor',
+          specialty: item.specialty || 'Specialist',
           avatar: item.avatar,
           date: new Date(item.date).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }),
           time: new Date(item.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          type: item.type === 'Online' ? 'Video' : 'In-Clinic',
-          status: item.status,
+          type: item.type?.toLowerCase() === 'online' ? 'Video' : 'In-Clinic',
+          status: item.status || 'Pending',
           location: item.location || 'Clinic Cabin',
         }));
         setAppointments(mapped);
@@ -225,9 +236,11 @@ export default function MyAppointments() {
               <Bell className="w-5 h-5 text-slate-400" />
               <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
             </button>
-            <img 
-              src="https://i.pravatar.cc/150?u=patient" 
+            <Image 
+              src={""} 
               alt="Profile" 
+              width={40} 
+              height={40} 
               className="w-10 h-10 rounded-xl border-2 border-white shadow-sm" 
             />
           </div>
@@ -280,9 +293,9 @@ export default function MyAppointments() {
                 <AlertCircle size={18} />
               </div>
               <div>
-                <h4 className="font-bold text-[#16BCC8] text-sm">Don't forget!</h4>
+                <h4 className="font-bold text-[#16BCC8] text-sm">Don&apos;t forget!</h4>
                 <p className="text-slate-500 text-xs mt-1">
-                  You have a video consultation coming up with Dr. Sarah Wilson on Oct 26.
+                  Your next appointment is with {filteredAppointments[0].doctorName} on {filteredAppointments[0].date} at {filteredAppointments[0].time}.
                 </p>
               </div>
             </div>
@@ -345,7 +358,7 @@ export default function MyAppointments() {
                       <StatusBadge status={apt.status} />
                       
                       <div className="flex items-center gap-2">
-                        {apt.status === 'Confirmed' || apt.status === 'Pending' ? (
+                        {['confirmed', 'pending', 'checked-in', 'in-progress', 'upcoming'].includes(apt.status.toLowerCase()) ? (
                           <>
                             <button className="px-4 py-2 bg-gradient-to-r from-[#16BCC8] to-[#0ea5a9] text-white text-sm font-semibold rounded-xl transition-all duration-300 shadow-sm hover:shadow-[0_2px_12px_rgba(22,188,200,0.3)]">
                               {apt.type === 'Video' ? 'Join Call' : 'View Details'}

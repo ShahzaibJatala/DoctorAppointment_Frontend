@@ -115,6 +115,7 @@ export default function DoctorSchedule() {
       const profile = res.data;
       if (profile) {
         setDoctorName(profile.fullName || 'Doctor');
+        setIsVideoEnabled(profile.isVideoEnabled !== false);
         
         if (profile.availability && profile.availability.length > 0) {
           // Detect slot duration from DB availability differences
@@ -238,7 +239,8 @@ export default function DoctorSchedule() {
       });
 
       await axios.post(`${serverUrl}/doctor/updateAvailability`, {
-        availability: dbAvailability
+        availability: dbAvailability,
+        isVideoEnabled: isVideoEnabled
       }, {
         headers: { Authorization: `Bearer ${cleanToken}` }
       });

@@ -4,7 +4,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import {
   Calendar, Clock, MapPin, Video, CreditCard,
   ChevronRight, CheckCircle2, ArrowLeft, Check,
-  Loader2, Info, Star, ShieldCheck, User, AlertCircle
+  Loader2, Info, Star, ShieldCheck, User, AlertCircle,
+  Building2, UploadCloud, FileImage
 } from 'lucide-react';
 import axios from 'axios';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
@@ -92,8 +93,12 @@ function StepIndicator({ step }: { step: BookingStep }) {
 }
 
 // ─── Time Slot Group ─────────────────────────────────────────────────────────
-function SlotGroup({ title, slots, selected, onSelect }: {
-  title: string; slots: TimeSlot[]; selected: string | null; onSelect: (t: string) => void;
+function SlotGroup({ title, slots, selected, bookedSlots = [], onSelect }: {
+  title: string;
+  slots: TimeSlot[];
+  selected: string | null;
+  bookedSlots?: string[];
+  onSelect: (t: string) => void;
 }) {
   if (!slots.length) return null;
   return (
@@ -104,26 +109,38 @@ function SlotGroup({ title, slots, selected, onSelect }: {
         <span className="flex-1 h-px bg-slate-200 inline-block" />
       </p>
       <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-2">
-        {slots.map((slot, i) => (
-          <button
-            key={i}
-            onClick={() => onSelect(slot.time)}
-            className={`py-2.5 text-xs font-bold rounded-xl border-2 transition-all ${
-              selected === slot.time
-                ? 'bg-teal-600 border-teal-600 text-white shadow-md scale-105'
-                : 'bg-white border-slate-200 text-slate-600 hover:border-teal-400 hover:text-teal-700 hover:bg-teal-50'
-            }`}
-          >
-            {slot.time}
-          </button>
-        ))}
+        {slots.map((slot, i) => {
+          const isBooked = bookedSlots.includes(slot.time);
+          return (
+            <button
+              key={i}
+              disabled={isBooked}
+              onClick={() => onSelect(slot.time)}
+              className={`py-2.5 text-xs font-bold rounded-xl border-2 transition-all relative ${
+                isBooked
+                  ? 'bg-slate-100 border-slate-200 text-slate-400 line-through cursor-not-allowed opacity-60'
+                  : selected === slot.time
+                  ? 'bg-teal-600 border-teal-600 text-white shadow-md scale-105'
+                  : 'bg-white border-slate-200 text-slate-600 hover:border-teal-400 hover:text-teal-700 hover:bg-teal-50'
+              }`}
+            >
+              {slot.time}
+              {isBooked && (
+                <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
-export default function GetAppointmentPage() {
+function GetAppointmentPageContent() {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -144,18 +161,96 @@ export default function GetAppointmentPage() {
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
 
   // Payment state
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'cash' | 'easypaisa' | 'jazzcash'>('card');
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'cash' | 'easypaisa' | 'jazzcash' | 'bank_transfer'>('card');
   const [cardName, setCardName] = useState('');
   const [cardNumber, setCardNumber] = useState('');
   const [cardExpiry, setCardExpiry] = useState('');
   const [cardCVV, setCardCVV] = useState('');
   const [mobileWalletNumber, setMobileWalletNumber] = useState('');
+  const [bankReceiptFile, setBankReceiptFile] = useState<File | null>(null);
+  const [bankReceiptPreview, setBankReceiptPreview] = useState<string | null>(null);
 
   // Status
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [walletStage, setWalletStage] = useState<'idle' | 'sending' | 'authorizing'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const [doctorProfile, setDoctorProfile] = useState<any>(null);
+  const [bookedAppointments, setBookedAppointments] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (doctorProfile && doctorProfile.isVideoEnabled === false) {
+      setBookingType('Clinic');
+    }
+  }, [doctorProfile]);
+
+  useEffect(() => {
+    async function fetchBookedAppointments() {
+      try {
+        const token = await getToken();
+        if (!token) return;
+        const cleanToken = token.replace(/"/g, '').trim();
+        const res = await axios.get(`${serverUrl}/patient/doctor-appointments/${doctorId}`, {
+          headers: {
+            Authorization: `Bearer ${cleanToken}`,
+          }
+        });
+        setBookedAppointments(res.data);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    fetchBookedAppointments();
+  }, [doctorId, serverUrl]);
+
+  useEffect(() => {
+    const eventSource = new EventSource(`${serverUrl}/realtime/stream`);
+    eventSource.onmessage = (event) => {
+      try {
+        const sseData = JSON.parse(event.data);
+        if (sseData.type === 'appointment_booked' && sseData.data.doctorId === doctorId) {
+          setBookedAppointments((prev) => {
+            const exists = prev.some(
+              (app) => new Date(app.startTime).getTime() === new Date(sseData.data.startTime).getTime()
+            );
+            if (exists) return prev;
+            return [...prev, sseData.data];
+          });
+        } else if (sseData.type === 'appointment_updated' && sseData.data.doctorId === doctorId) {
+          setBookedAppointments((prev) => {
+            if (sseData.data.status === 'cancelled') {
+              return prev.filter(
+                (app) => new Date(app.startTime).getTime() !== new Date(sseData.data.startTime).getTime()
+              );
+            } else {
+              const index = prev.findIndex(
+                (app) => new Date(app.startTime).getTime() === new Date(sseData.data.startTime).getTime()
+              );
+              if (index === -1) {
+                return [...prev, sseData.data];
+              }
+              const next = [...prev];
+              next[index] = { ...next[index], status: sseData.data.status };
+              return next;
+            }
+          });
+        } else if (sseData.type === 'availability_updated' && sseData.data.doctorId === doctorId) {
+          setDoctorProfile((prev: any) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              availability: sseData.data.availability,
+              isVideoEnabled: sseData.data.isVideoEnabled,
+            };
+          });
+        }
+      } catch (err) {
+        console.error('SSE error:', err);
+      }
+    };
+    return () => {
+      eventSource.close();
+    };
+  }, [doctorId, serverUrl]);
 
   useEffect(() => {
     async function fetchDoctorDetails() {
@@ -186,25 +281,20 @@ export default function GetAppointmentPage() {
     const dayNamesFull = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const currentDayName = dayNamesFull[date.getDay()];
     const slotsForDay = doctorProfile.availability?.filter(
-      (slot: any) => slot.day === currentDayName
+      (slot: any) => slot.day === currentDayName && slot.isAvailable
     ) || [];
-    if (slotsForDay.length > 0) {
-      return slotsForDay.some((slot: any) => slot.isAvailable);
-    }
-    const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-    return !isWeekend;
+    return slotsForDay.length > 0;
   };
 
   const getFilteredTimeSlots = (date: Date) => {
-    if (!doctorProfile) return TIME_SLOTS;
+    if (!doctorProfile) return [];
     const dayNamesFull = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const currentDayName = dayNamesFull[date.getDay()];
     const slotsForDay = doctorProfile.availability?.filter(
       (slot: any) => slot.day === currentDayName && slot.isAvailable
     ) || [];
     if (slotsForDay.length === 0) {
-      const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-      return isWeekend ? [] : TIME_SLOTS;
+      return [];
     }
     const parseTime = (str: string) => {
       const [timePart, period] = str.split(' ');
@@ -235,9 +325,39 @@ export default function GetAppointmentPage() {
   const afternoon = filteredSlots.filter(s => s.period === 'Afternoon');
   const evening = filteredSlots.filter(s => s.period === 'Evening');
 
+  const bookedTimesForSelectedDay = useMemo(() => {
+    if (!days[selectedDayIdx]) return [];
+    const selectedDate = days[selectedDayIdx].date;
+    return bookedAppointments
+      .filter((app) => {
+        const appDate = new Date(app.startTime);
+        return (
+          appDate.getDate() === selectedDate.getDate() &&
+          appDate.getMonth() === selectedDate.getMonth() &&
+          appDate.getFullYear() === selectedDate.getFullYear() &&
+          app.status !== 'cancelled'
+        );
+      })
+      .map((app) => {
+        const d = new Date(app.startTime);
+        let hours = d.getHours();
+        const minutes = d.getMinutes();
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12;
+        hours = hours ? hours : 12;
+        const minutesStr = minutes < 10 ? '0' + minutes : minutes;
+        const hoursStr = hours < 10 ? '0' + hours : hours;
+        return `${hoursStr}:${minutesStr} ${ampm}`;
+      });
+  }, [bookedAppointments, selectedDayIdx, days]);
+
   const cardValid = cardName.trim().length > 2 && cardNumber.length >= 19 && cardExpiry.length === 5 && cardCVV.length === 3;
   const walletValid = mobileWalletNumber.replace(/\D/g, '').length >= 10;
-  const canPay = paymentMethod === 'cash' || cardValid || ((paymentMethod === 'easypaisa' || paymentMethod === 'jazzcash') && walletValid);
+  const bankTransferValid = bankReceiptFile !== null;
+  const canPay = paymentMethod === 'cash'
+    || (paymentMethod === 'card' && cardValid)
+    || ((paymentMethod === 'easypaisa' || paymentMethod === 'jazzcash') && walletValid)
+    || (paymentMethod === 'bank_transfer' && bankTransferValid);
 
   const handleConfirm = async () => {
     setIsSubmitting(true);
@@ -306,6 +426,39 @@ export default function GetAppointmentPage() {
           }
           return;
         }
+      } else if (paymentMethod === 'bank_transfer') {
+        // --- BANK TRANSFER: upload screenshot then book ---
+        if (!bankReceiptFile) {
+          setErrorMessage('Please upload your bank transfer receipt screenshot.');
+          setIsSubmitting(false);
+          return;
+        }
+
+        // Upload receipt to Cloudinary via backend
+        const receiptForm = new FormData();
+        receiptForm.append('file', bankReceiptFile);
+        const uploadRes = await axios.post(`${serverUrl}/doctor/uploadReceipt`, receiptForm, {
+          headers: {
+            Authorization: `Bearer ${token.replace(/"/g, '').trim()}`,
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+        const bankTransferReceiptUrl = uploadRes.data.url;
+
+        await axios.post(`${serverUrl}/doctor/addPatient`, {
+          doctorId,
+          startTime: startDateTime.toISOString(),
+          endTime: endDateTime.toISOString(),
+          appointmentType: bookingType,
+          paymentMethod: 'bank_transfer',
+          bankTransferReceiptUrl,
+        }, {
+          headers: {
+            Authorization: `Bearer ${token.replace(/"/g, '').trim()}`,
+            'Content-Type': 'application/json',
+          },
+          withCredentials: true,
+        });
       } else {
         // --- STEP 2: DIRECT BOOKING (Cash On Visit) ---
         await axios.post(`${serverUrl}/doctor/addPatient`, {
@@ -342,6 +495,7 @@ export default function GetAppointmentPage() {
     setStep('datetime'); setSelectedTime(null); setSelectedDayIdx(0);
     setCardName(''); setCardNumber(''); setCardExpiry(''); setCardCVV('');
     setMobileWalletNumber('');
+    setBankReceiptFile(null); setBankReceiptPreview(null);
     setErrorMessage('');
   };
 
@@ -442,25 +596,27 @@ export default function GetAppointmentPage() {
               {step === 'datetime' && (
                 <div>
                   {/* Consultation type */}
-                  <div className="flex p-1 bg-slate-100 rounded-xl mb-6">
-                    {(['Clinic', 'Video'] as BookingType[]).map(type => (
-                      <button
-                        key={type}
-                        onClick={() => setBookingType(type)}
-                        className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold rounded-lg transition-all ${
-                          bookingType === type ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                        }`}
-                      >
-                        {type === 'Clinic' ? <MapPin size={16} /> : <Video size={16} />}
-                        <span>{type === 'Clinic' ? 'In-Clinic' : 'Video Call'}</span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
-                          bookingType === type ? 'bg-teal-50 text-teal-600' : 'bg-slate-200 text-slate-500'
-                        }`}>
-                          ${type === 'Clinic' ? consultationFee : Math.round(consultationFee * 0.75)}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
+                  {doctorProfile?.isVideoEnabled !== false && (
+                    <div className="flex p-1 bg-slate-100 rounded-xl mb-6">
+                      {(['Clinic', 'Video'] as BookingType[]).map(type => (
+                        <button
+                          key={type}
+                          onClick={() => setBookingType(type)}
+                          className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold rounded-lg transition-all ${
+                            bookingType === type ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                          }`}
+                        >
+                          {type === 'Clinic' ? <MapPin size={16} /> : <Video size={16} />}
+                          <span>{type === 'Clinic' ? 'In-Clinic' : 'Video Call'}</span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
+                            bookingType === type ? 'bg-teal-50 text-teal-600' : 'bg-slate-200 text-slate-500'
+                          }`}>
+                            ${type === 'Clinic' ? consultationFee : Math.round(consultationFee * 0.75)}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
 
                   {/* Date picker */}
                   <div className="mb-6">
@@ -498,9 +654,9 @@ export default function GetAppointmentPage() {
                     <h3 className="font-bold text-slate-800 text-sm mb-3 flex items-center gap-2">
                       <Clock size={15} className="text-teal-600" /> Available Time Slots
                     </h3>
-                    <SlotGroup title="Morning" slots={morning} selected={selectedTime} onSelect={setSelectedTime} />
-                    <SlotGroup title="Afternoon" slots={afternoon} selected={selectedTime} onSelect={setSelectedTime} />
-                    <SlotGroup title="Evening" slots={evening} selected={selectedTime} onSelect={setSelectedTime} />
+                    <SlotGroup title="Morning" slots={morning} selected={selectedTime} bookedSlots={bookedTimesForSelectedDay} onSelect={setSelectedTime} />
+                    <SlotGroup title="Afternoon" slots={afternoon} selected={selectedTime} bookedSlots={bookedTimesForSelectedDay} onSelect={setSelectedTime} />
+                    <SlotGroup title="Evening" slots={evening} selected={selectedTime} bookedSlots={bookedTimesForSelectedDay} onSelect={setSelectedTime} />
                   </div>
 
                   {/* Selection summary */}
@@ -583,12 +739,13 @@ export default function GetAppointmentPage() {
 
                   {/* Payment method */}
                   <h3 className="font-bold text-slate-800 text-sm mb-3">Payment Method</h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-5">
                     {[
                       { id: 'card', name: 'Pay by Card', icon: <CreditCard size={20} /> },
                       { id: 'cash', name: 'Pay at Clinic', icon: <span className="text-xl">💵</span> },
                       { id: 'easypaisa', name: 'EasyPaisa', icon: <span className="text-lg font-extrabold text-emerald-600">EP</span> },
                       { id: 'jazzcash', name: 'JazzCash', icon: <span className="text-lg font-extrabold text-amber-600">JC</span> },
+                      { id: 'bank_transfer', name: 'Direct Bank', icon: <Building2 size={20} className="text-blue-600" /> },
                     ].map(method => (
                       <button
                         key={method.id}
@@ -693,6 +850,87 @@ export default function GetAppointmentPage() {
                     </div>
                   )}
 
+                  {/* Bank Transfer */}
+                  {paymentMethod === 'bank_transfer' && (
+                    <div className="space-y-4 mb-5 p-5 bg-blue-50 rounded-2xl border border-blue-200">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0">
+                          <Building2 size={18} />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-slate-800 text-sm">Direct Bank Transfer</h4>
+                          <p className="text-xs text-slate-500">Transfer fee to doctor's bank account, then upload receipt</p>
+                        </div>
+                      </div>
+
+                      {/* Doctor's bank details */}
+                      {doctorProfile?.bankName || doctorProfile?.accountNumber ? (
+                        <div className="bg-white rounded-xl border border-blue-100 p-4 space-y-2">
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Doctor's Bank Details</p>
+                          {doctorProfile.bankName && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-slate-500">Bank Name</span>
+                              <span className="font-bold text-slate-800">{doctorProfile.bankName}</span>
+                            </div>
+                          )}
+                          {doctorProfile.accountHolderName && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-slate-500">Account Holder</span>
+                              <span className="font-bold text-slate-800">{doctorProfile.accountHolderName}</span>
+                            </div>
+                          )}
+                          {doctorProfile.accountNumber && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-slate-500">Account / IBAN</span>
+                              <span className="font-bold text-slate-800 font-mono">{doctorProfile.accountNumber}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between text-sm border-t border-blue-50 pt-2 mt-2">
+                            <span className="text-slate-500 font-bold">Amount to Transfer</span>
+                            <span className="font-extrabold text-blue-700">${fee}</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="bg-white rounded-xl border border-amber-100 p-4">
+                          <p className="text-sm text-amber-700 font-medium">ℹ️ Doctor hasn't added bank details yet. Please contact the clinic directly.</p>
+                        </div>
+                      )}
+
+                      {/* Receipt upload */}
+                      <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Upload Transfer Receipt *</label>
+                        <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-blue-300 rounded-xl cursor-pointer bg-white hover:bg-blue-50/50 hover:border-blue-400 transition-all">
+                          {bankReceiptPreview ? (
+                            <img src={bankReceiptPreview} alt="Receipt preview" className="w-full h-full object-contain rounded-xl" />
+                          ) : (
+                            <div className="flex flex-col items-center justify-center gap-2">
+                              <UploadCloud size={24} className="text-blue-400" />
+                              <p className="text-sm text-slate-500">Click to upload screenshot</p>
+                              <p className="text-xs text-slate-400">PNG, JPG up to 5MB</p>
+                            </div>
+                          )}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={e => {
+                              const file = e.target.files?.[0] || null;
+                              setBankReceiptFile(file);
+                              if (file) setBankReceiptPreview(URL.createObjectURL(file));
+                              else setBankReceiptPreview(null);
+                            }}
+                          />
+                        </label>
+                        {bankReceiptFile && (
+                          <p className="text-xs text-green-700 mt-1.5 flex items-center gap-1">
+                            <FileImage size={12} /> {bankReceiptFile.name}
+                          </p>
+                        )}
+                        <p className="text-xs text-slate-400 mt-1.5">Transfer the exact amount to the above account, take a screenshot of the successful transfer, and upload it here.</p>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Error */}
                   {errorMessage && (
                     <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm flex items-start gap-2">
@@ -778,5 +1016,17 @@ export default function GetAppointmentPage() {
         </main>
       </div>
     </div>
+  );
+}
+
+export default function GetAppointmentPage() {
+  return (
+    <React.Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <Loader2 className="w-8 h-8 text-teal-600 animate-spin" />
+      </div>
+    }>
+      <GetAppointmentPageContent />
+    </React.Suspense>
   );
 }

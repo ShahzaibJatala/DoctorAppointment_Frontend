@@ -118,7 +118,17 @@ export default function PatientDashboard() {
         });
         if (aptRes.ok) {
           const aptData = await aptRes.json();
-          setAppointments(aptData);
+          const mapped = aptData.map((item: any) => ({
+            id: item.id || item._id,
+            doctorName: item.doctorName,
+            specialty: item.specialty,
+            avatar: item.avatar || `https://ui-avatars.com/api/?name=${item.doctorName || 'D'}&background=16BCC8&color=fff`,
+            date: item.startTime,
+            time: item.startTime,
+            type: item.appointmentType === 'Online' ? 'Video' : 'In-Clinic',
+            status: item.status,
+          }));
+          setAppointments(mapped);
         }
       } catch (err) {
         console.error(err);

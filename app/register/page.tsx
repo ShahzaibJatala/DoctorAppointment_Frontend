@@ -2,7 +2,7 @@
 import { Button } from "@/components/UI/button";
 import { Input } from "@/components/UI/input";
 import { Label } from "@/components/UI/label";
-import { Heart, Mail, Lock, User, ArrowRight, Stethoscope, UserRound, ShieldCheck } from "lucide-react";
+import { Heart, Mail, Lock, User, ArrowRight, Stethoscope, UserRound, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { registerAction } from "../actions/auth";
@@ -19,6 +19,7 @@ const Register = () => {
   });
 
   const [animate,setAnimate] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   // 2. Generic handler for text inputs
   const handleChange = (e : React.ChangeEvent<HTMLInputElement>) => {
@@ -60,7 +61,6 @@ const Register = () => {
   const roles = [
     { value: "patient", label: "Patient", icon: UserRound, desc: "Book appointments" },
     { value: "doctor", label: "Doctor", icon: Stethoscope, desc: "Manage practice" },
-    { value: "admin", label: "Admin", icon: ShieldCheck, desc: "System admin" },
   ];
 
   return (
@@ -131,7 +131,7 @@ const Register = () => {
                 I want to join as
               </label>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 {roles.map(({ value, label, icon: Icon, desc }) => (
                   <label
                     key={value}
@@ -223,12 +223,23 @@ const Register = () => {
                 <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-300" />
                 <Input
                   id="password"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
-                  className="pl-11 h-12 rounded-xl border-slate-200 bg-slate-50/50 focus:bg-white focus:border-[#16BCC8] transition-all duration-200"
+                  className="pl-11 pr-10 h-12 rounded-xl border-slate-200 bg-slate-50/50 focus:bg-white focus:border-[#16BCC8] transition-all duration-200"
                   value={formData.password}
                   onChange={handleChange}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                >
+                  {showPassword ? (
+                    <EyeOff size={16} />
+                  ) : (
+                    <Eye size={16} />
+                  )}
+                </button>
               </div>
               <p className="text-xs text-slate-400 leading-relaxed">
                 Must be at least 8 characters with a number and special
