@@ -49,7 +49,7 @@ function BookWalkInContent() {
         });
         setDoctor(docResponse.data);
 
-        const bookedRes = await axios.get(`${serverUrl}/patient/doctor-appointments/${docResponse.data._id}`, {
+        const bookedRes = await axios.get(`${serverUrl}/compounder/bookings`, {
           headers: { Authorization: `Bearer ${cleanToken}` }
         });
         setBookedAppointments(bookedRes.data);
@@ -217,6 +217,48 @@ function BookWalkInContent() {
       </header>
 
       <div className="p-6 max-w-3xl mx-auto space-y-6">
+        <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 sm:p-6">
+          <div className="flex items-center justify-between gap-3 mb-5">
+            <div>
+              <h2 className="text-lg font-extrabold text-slate-800">All Bookings</h2>
+              <p className="text-xs text-slate-400">Patient, timing, status and transaction details</p>
+            </div>
+            <span className="rounded-full bg-teal-50 px-3 py-1 text-xs font-bold text-teal-700">{bookedAppointments.length}</span>
+          </div>
+          {bookedAppointments.length === 0 ? (
+            <p className="py-8 text-center text-sm text-slate-400">No bookings found.</p>
+          ) : (
+            <div className="space-y-3 max-h-[520px] overflow-y-auto pr-1">
+              {bookedAppointments.map((booking, index) => (
+                <article key={booking.appointmentId || index} className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                    <div>
+                      <h3 className="font-bold text-slate-800">{booking.patientName || booking.name || booking.fullName || booking.email || 'Patient'}</h3>
+                      <p className="text-xs text-slate-500">{booking.patientPhone || booking.phoneNumber || booking.phone || 'No phone provided'}</p>
+                      <p className="mt-1 text-xs text-slate-500">Age: {booking.patientAge || 'N/A'} · Gender: {booking.patientGender || 'Not provided'}</p>
+                    </div>
+                    <span className="self-start rounded-full bg-white border border-slate-200 px-2.5 py-1 text-xs font-bold capitalize text-slate-600">{booking.status}</span>
+                  </div>
+                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-600">
+                    <p><strong>Date:</strong> {new Date(booking.startTime).toLocaleDateString()}</p>
+                    <p><strong>Time:</strong> {new Date(booking.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} – {new Date(booking.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                    <p><strong>Type:</strong> {booking.appointmentType || 'Clinic'}</p>
+                    <p><strong>Payment:</strong> {booking.paymentMethod || 'Not specified'}</p>
+                    {booking.mobileWalletNumber && <p><strong>Wallet:</strong> {booking.mobileWalletNumber}</p>}
+                    {booking.tokenNumber && <p><strong>Token:</strong> {booking.tokenNumber}</p>}
+                  </div>
+                  {booking.paymentMethod === 'bank_transfer' && booking.bankTransferReceiptUrl && (
+                    <a href={booking.bankTransferReceiptUrl} target="_blank" rel="noopener noreferrer" className="mt-3 block">
+                      <p className="mb-2 text-xs font-bold text-blue-700">Bank transfer receipt</p>
+                      <img src={booking.bankTransferReceiptUrl} alt="Bank transfer receipt" className="max-h-40 rounded-lg border border-blue-100 object-contain bg-white" />
+                    </a>
+                  )}
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 relative overflow-hidden">
           {success ? (
             <div className="text-center py-8 space-y-5 animate-fade-up">

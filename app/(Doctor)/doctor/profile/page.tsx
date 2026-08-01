@@ -7,7 +7,6 @@ import {
   MapPin, 
   FileText, 
   UploadCloud, 
-  DollarSign, 
   ShieldCheck,
   CheckCircle2,
   ChevronRight,
@@ -23,6 +22,8 @@ import axios from 'axios';
 import { getToken } from '@/app/actions/token';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+
+const SPECIALIZATIONS = ['Cardiology', 'Dermatology', 'General Practice', 'Neurology', 'Pediatrics', 'Orthopedics', 'Psychiatry'];
 
 // --- Reusable Form Components ---
 
@@ -88,6 +89,8 @@ export default function DoctorProfileForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [specializationOption, setSpecializationOption] = useState('');
+  const [customSpecialization, setCustomSpecialization] = useState('');
 
   const [formData, setFormData] = useState({
     fullName: '',
@@ -95,6 +98,7 @@ export default function DoctorProfileForm() {
     phoneNumber: '',
     language: '', 
     specialization: '',
+    services: '',
     experienceYears: 0, 
     LicenseNumber: '',  
     medicalBoard: '',    
@@ -103,7 +107,10 @@ export default function DoctorProfileForm() {
     clinicAddress: '',   
     city: '',            
     province: '',        
+    clinicLatitude: '',
+    clinicLongitude: '',
     consultationFee: '',
+    videoConsultationFee: '',
     // Bank details
     bankName: '',
     accountHolderName: '',
@@ -135,12 +142,21 @@ export default function DoctorProfileForm() {
 
         const data = response.data;
         console.log("profile data", data);
+        const savedSpecialization = data.specialization || '';
+        if (savedSpecialization && !SPECIALIZATIONS.includes(savedSpecialization)) {
+          setSpecializationOption('Others');
+          setCustomSpecialization(savedSpecialization);
+        } else {
+          setSpecializationOption(savedSpecialization);
+        }
+
         setFormData({
           fullName: data.fullName || '',
           email: data.email || '',
           phoneNumber: data.phoneNumber || '',
           language: Array.isArray(data.language) ? data.language.join(', ') : (data.language || ''),
           specialization: data.specialization || '',
+          services: Array.isArray(data.services) ? data.services.join(', ') : (data.services || ''),
           experienceYears: data.experienceYears || '',
           LicenseNumber: data.LicenseNumber || '',
           medicalBoard: data.medicalBoard || '',
@@ -149,7 +165,10 @@ export default function DoctorProfileForm() {
           clinicAddress: data.clinicAddress || '',
           city: data.city || '',
           province: data.province || '',
+          clinicLatitude: data.clinicLatitude ?? '',
+          clinicLongitude: data.clinicLongitude ?? '',
           consultationFee: data.consultationFee || '',
+          videoConsultationFee: data.videoConsultationFee || '',
           bankName: data.bankName || '',
           accountHolderName: data.accountHolderName || '',
           accountNumber: data.accountNumber || ''
@@ -175,6 +194,39 @@ export default function DoctorProfileForm() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const useCurrentClinicLocation = () => {
+    if (!navigator.geolocation) {
+      setErrorMessage('Location access is not supported by this browser.');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      position => {
+        setFormData(prev => ({
+          ...prev,
+          clinicLatitude: position.coords.latitude.toFixed(6),
+          clinicLongitude: position.coords.longitude.toFixed(6),
+        }));
+        setErrorMessage('');
+      },
+      () => setErrorMessage('Allow location access while you are at the clinic.'),
+      { enableHighAccuracy: true },
+    );
+  };
+
+  const handleSpecializationChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    setSpecializationOption(value);
+    setFormData(prev => ({
+      ...prev,
+      specialization: value === 'Others' ? customSpecialization : value
+    }));
+  };
+
+  const handleCustomSpecializationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setCustomSpecialization(e.target.value);
+    setFormData(prev => ({ ...prev, specialization: e.target.value }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -187,6 +239,10 @@ export default function DoctorProfileForm() {
       finalPayload.append('email', formData.email);
       finalPayload.append('phoneNumber', formData.phoneNumber);
       finalPayload.append('specialization', formData.specialization);
+      formData.services.split(',')
+        .map(service => service.trim())
+        .filter(Boolean)
+        .forEach(service => finalPayload.append('services', service));
 
       if (formData.language) {
           const languagesArray = formData.language.split(',').map(l => l.trim()).filter(Boolean);
@@ -205,7 +261,10 @@ export default function DoctorProfileForm() {
       if(formData.city) finalPayload.append('city', formData.city);
       if(formData.province) finalPayload.append('province', formData.province);
       if(formData.consultationFee) finalPayload.append('consultationFee', String(formData.consultationFee));
+      if(formData.videoConsultationFee) finalPayload.append('videoConsultationFee', String(formData.videoConsultationFee));
 
+      if(formData.clinicLatitude) finalPayload.append('clinicLatitude', String(formData.clinicLatitude));
+      if(formData.clinicLongitude) finalPayload.append('clinicLongitude', String(formData.clinicLongitude));
       // Bank details
       if(formData.bankName) finalPayload.append('bankName', formData.bankName);
       if(formData.accountHolderName) finalPayload.append('accountHolderName', formData.accountHolderName);
@@ -325,8 +384,8 @@ export default function DoctorProfileForm() {
                 <Input type="tel" name="phoneNumber" value={formData.phoneNumber} onChange={handleInputChange} required placeholder="+1 (555) 000-0000" />
               </div>
               <div className="md:col-span-2">
-                <Label>Languages Spoken <span className="text-xs text-slate-300 font-normal">(Optional)</span></Label>
-                <Input name="language" value={formData.language} onChange={handleInputChange} placeholder="e.g. English, Spanish, Mandarin (Comma separated)" />
+                <Label required>Languages Spoken</Label>
+                <Input name="language" value={formData.language} onChange={handleInputChange} required placeholder="e.g. English, Spanish, Mandarin (Comma separated)" />
               </div>
             </div>
           </SectionCard>
@@ -336,27 +395,39 @@ export default function DoctorProfileForm() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <Label required>Primary Specialization</Label>
-                <Select name="specialization" value={formData.specialization} onChange={handleInputChange} required options={['Cardiology', 'Dermatology', 'General Practice', 'Neurology', 'Pediatrics', 'Orthopedics', 'Psychiatry']} />
+                <Select name="specializationOption" value={specializationOption} onChange={handleSpecializationChange} required options={[...SPECIALIZATIONS, 'Others']} />
+                {specializationOption === 'Others' && (
+                  <div className="mt-3">
+                    <Label required>Your Specialization</Label>
+                    <Input name="customSpecialization" value={customSpecialization} onChange={handleCustomSpecializationChange} required placeholder="Enter your specialization" />
+                  </div>
+                )}
+              </div>
+              <div className="md:col-span-2">
+                <Label required>Services</Label>
+                <Input name="services" value={formData.services} onChange={handleInputChange} required placeholder="e.g. ECG, Diabetes Management, General Consultation (comma separated)" />
+                <p className="text-xs text-slate-400 mt-1.5">Separate multiple services with commas.</p>
               </div>
               <div>
                 <Label required>Years of Experience</Label>
                 <Input type="number" name="experienceYears" value={formData.experienceYears} onChange={handleInputChange} required placeholder="e.g. 10" />
               </div>
               <div>
-                <Label>Medical License Number <span className="text-xs text-slate-300 font-normal">(Optional)</span></Label>
-                <Input type="number" name="LicenseNumber" value={formData.LicenseNumber} onChange={handleInputChange} placeholder="e.g. 12345678" />
+                <Label required>Medical License Number</Label>
+                <Input type="number" name="LicenseNumber" value={formData.LicenseNumber} onChange={handleInputChange} required placeholder="e.g. 12345678" />
                 <p className="text-xs text-slate-300 mt-1.5">Numbers only based on current requirements.</p>
               </div>
               <div>
-                <Label>Issuing Medical Board <span className="text-xs text-slate-300 font-normal">(Optional)</span></Label>
-                <Input name="medicalBoard" value={formData.medicalBoard} onChange={handleInputChange} placeholder="e.g. California Medical Board" />
+                <Label required>Issuing Medical Board</Label>
+                <Input name="medicalBoard" value={formData.medicalBoard} onChange={handleInputChange} required placeholder="e.g. California Medical Board" />
               </div>
               <div className="md:col-span-2">
-                <Label>Professional Biography <span className="text-xs text-slate-300 font-normal">(Optional)</span></Label>
+                <Label required>Professional Biography</Label>
                 <textarea 
                   name="Bio"
                   value={formData.Bio}
                   onChange={handleInputChange}
+                  required
                   rows={4} 
                   placeholder="Write a brief professional bio..."
                   className="w-full bg-slate-50/80 border border-slate-200 text-slate-900 text-sm rounded-xl focus:ring-2 focus:ring-[#16BCC8]/15 focus:border-[#16BCC8] block p-3 transition-all duration-200 resize-y"
@@ -369,27 +440,55 @@ export default function DoctorProfileForm() {
           <SectionCard title="Clinic & Pricing" icon={MapPin} description="Where you practice and your consultation fees.">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="md:col-span-2">
-                <Label>Clinic / Hospital Name <span className="text-xs text-slate-300 font-normal">(Optional)</span></Label>
-                <Input name="clinicName" value={formData.clinicName} onChange={handleInputChange} placeholder="e.g. Heart & Vascular Institute" />
+                <Label required>Clinic / Hospital Name</Label>
+                <Input name="clinicName" value={formData.clinicName} onChange={handleInputChange} required placeholder="e.g. Heart & Vascular Institute" />
               </div>
               <div className="md:col-span-2">
-                <Label>Clinic Address <span className="text-xs text-slate-300 font-normal">(Optional)</span></Label>
-                <Input name="clinicAddress" value={formData.clinicAddress} onChange={handleInputChange} placeholder="Street address, Suite, Floor..." />
+                <Label required>Clinic Address</Label>
+                <Input name="clinicAddress" value={formData.clinicAddress} onChange={handleInputChange} required placeholder="Street address, Suite, Floor..." />
               </div>
               <div>
-                <Label>City <span className="text-xs text-slate-300 font-normal">(Optional)</span></Label>
-                <Input name="city" value={formData.city} onChange={handleInputChange} placeholder="e.g. San Francisco" />
+                <Label required>City</Label>
+                <Input name="city" value={formData.city} onChange={handleInputChange} required placeholder="e.g. San Francisco" />
               </div>
               <div>
-                <Label>Province / State <span className="text-xs text-slate-300 font-normal">(Optional)</span></Label>
-                <Input name="province" value={formData.province} onChange={handleInputChange} placeholder="e.g. CA" />
+                <Label required>Province / State</Label>
+                <Input name="province" value={formData.province} onChange={handleInputChange} required placeholder="e.g. CA" />
               </div>
-              
-              <div className="md:col-span-2 mt-4 pt-6 border-t border-slate-100">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <Label required>Clinic Latitude</Label>
+                <Input type="number" name="clinicLatitude" value={formData.clinicLatitude} onChange={handleInputChange} required placeholder="31.5204" />
+              </div>
+              <div>
+                <Label required>Clinic Longitude</Label>
+                <Input type="number" name="clinicLongitude" value={formData.clinicLongitude} onChange={handleInputChange} required placeholder="74.3587" />
+              </div>
+              <div className="md:col-span-2">
+                <button type="button" onClick={useCurrentClinicLocation} className="inline-flex items-center gap-2 rounded-xl bg-teal-50 px-4 py-2.5 text-sm font-bold text-teal-700 hover:bg-teal-100">
+                  <MapPin size={16} /> Use My Current Clinic Location
+                </button>
+                <p className="mt-2 text-xs text-slate-400">Use this while physically present at the clinic, or enter the exact coordinates from Google Maps.</p>
+              </div>
+              {formData.clinicLatitude && formData.clinicLongitude && (
+                <div className="md:col-span-2 overflow-hidden rounded-2xl border border-slate-200">
+                  <iframe
+                    title="Clinic location preview"
+                    src={`https://www.google.com/maps?q=${formData.clinicLatitude},${formData.clinicLongitude}&z=16&output=embed`}
+                    className="h-64 w-full"
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                  />
+                </div>
+              )}
+              <div className="md:col-span-2 mt-4 border-t border-slate-100 pt-6">
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                   <div>
-                    <Label>Consultation Fee ($) <span className="text-xs text-slate-300 font-normal">(Optional)</span></Label>
-                    <Input type="number" icon={DollarSign} name="consultationFee" value={formData.consultationFee} onChange={handleInputChange} placeholder="120" />
+                    <Label required>In-Clinic Consultation Fee (PKR)</Label>
+                    <Input type="number" name="consultationFee" value={formData.consultationFee} onChange={handleInputChange} required placeholder="3000" />
+                  </div>
+                  <div>
+                    <Label required>Video Consultation Fee (PKR)</Label>
+                    <Input type="number" name="videoConsultationFee" value={formData.videoConsultationFee} onChange={handleInputChange} required placeholder="2500" />
                   </div>
                 </div>
               </div>
@@ -406,16 +505,16 @@ export default function DoctorProfileForm() {
                 </p>
               </div>
               <div>
-                <Label>Bank Name <span className="text-xs text-slate-300 font-normal">(Optional)</span></Label>
-                <Input name="bankName" value={formData.bankName} onChange={handleInputChange} placeholder="e.g. HBL, Meezan, UBL" />
+                <Label required>Bank Name</Label>
+                <Input name="bankName" value={formData.bankName} onChange={handleInputChange} required placeholder="e.g. HBL, Meezan, UBL" />
               </div>
               <div>
-                <Label>Account Holder Name <span className="text-xs text-slate-300 font-normal">(Optional)</span></Label>
-                <Input name="accountHolderName" value={formData.accountHolderName} onChange={handleInputChange} placeholder="e.g. Dr. Ahmed Ali" />
+                <Label required>Account Holder Name</Label>
+                <Input name="accountHolderName" value={formData.accountHolderName} onChange={handleInputChange} required placeholder="e.g. Dr. Ahmed Ali" />
               </div>
               <div className="md:col-span-2">
-                <Label>Account Number / IBAN <span className="text-xs text-slate-300 font-normal">(Optional)</span></Label>
-                <Input name="accountNumber" value={formData.accountNumber} onChange={handleInputChange} placeholder="e.g. PK36SCBL0000001123456702" />
+                <Label required>Account Number / IBAN</Label>
+                <Input name="accountNumber" value={formData.accountNumber} onChange={handleInputChange} required placeholder="e.g. PK36SCBL0000001123456702" />
                 <p className="text-xs text-slate-400 mt-1.5">Enter your full IBAN or account number used for receiving payments.</p>
               </div>
             </div>
@@ -426,7 +525,7 @@ export default function DoctorProfileForm() {
             <div className="space-y-6">
               
               <div>
-                <Label>Profile Photo</Label>
+                <Label required>Profile Photo</Label>
                 <div className="mt-2 flex items-center gap-6">
                   <div className="w-24 h-24 rounded-2xl bg-slate-50 border-2 border-dashed border-slate-200 flex items-center justify-center text-slate-300 overflow-hidden shrink-0">
                     {profilePhoto ? (
@@ -446,7 +545,8 @@ export default function DoctorProfileForm() {
                       <input 
                         type="file" 
                         accept="image/*" 
-                        className="hidden" 
+                        required={!existingPhotoUrl}
+                        className="sr-only"
                         onChange={(e) => setProfilePhoto(e.target.files ? e.target.files[0] : null)} 
                       />
                     </label>

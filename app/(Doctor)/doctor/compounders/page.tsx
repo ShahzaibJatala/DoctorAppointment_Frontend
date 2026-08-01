@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   Users, UserPlus, Search, Phone, Mail, KeyRound, Loader2, X, PlusCircle, UserCheck, ShieldCheck, Eye, EyeOff,
-  ShieldOff, Trash2, AlertTriangle
+  ShieldOff, Trash2, AlertTriangle, Send
 } from 'lucide-react';
 import axios from 'axios';
 import { getToken } from '@/app/actions/token';
@@ -15,6 +15,8 @@ interface CompounderItem {
   email: string;
   phoneNumber: string;
   createdAt: string;
+  linked?: boolean;
+  pending?: boolean;
   status?: string;
 }
 
@@ -24,6 +26,9 @@ export default function DoctorCompounders() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<CompounderItem | null>(null);
+  const [compounderSearch, setCompounderSearch] = useState('');
+  const [searchResults, setSearchResults] = useState<CompounderItem[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   // Form fields
   const [fullName, setFullName] = useState('');
@@ -56,8 +61,48 @@ export default function DoctorCompounders() {
     fetchCompounders();
   }, []);
 
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      const query = compounderSearch.trim();
+      if (query.length < 2) {
+        setSearchResults([]);
+        return;
+      }
+      try {
+        setIsSearching(true);
+        const token = await getToken();
+        const response = await axios.get(`${serverUrl}/compounder/search`, {
+          params: { q: query },
+          headers: { Authorization: `Bearer ${String(token || '').replace(/"/g, '').trim()}` },
+        });
+        setSearchResults(response.data);
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [compounderSearch, serverUrl]);
+
+  const sendInvitation = async (compounderId: string) => {
+    setActionLoading(compounderId + '-invite');
+    try {
+      const token = await getToken();
+      await axios.post(`${serverUrl}/compounder/invite/${compounderId}`, {}, {
+        headers: { Authorization: `Bearer ${String(token || '').replace(/"/g, '').trim()}` },
+      });
+      setSearchResults(results => results.map(item => item._id === compounderId ? { ...item, pending: true } : item));
+    } catch (error: any) {
+      setErrorMsg(error.response?.data?.message || 'Could not send invitation.');
+    } finally {
+      setActionLoading(null);
+    }
+  };
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+
     if (!fullName || !email || !password || !phoneNumber) {
       setErrorMsg('Please fill all fields.');
       return;
@@ -154,6 +199,40 @@ export default function DoctorCompounders() {
 
       {isLoading ? (
         <div className="flex-1 flex flex-col items-center justify-center py-40">
+          <section className="rounded-2xl border border-slate-100 bg-white p-6 shadow-card">
+            <div className="mb-4">
+              <h3 className="font-bold text-slate-800">Import Existing Compounder</h3>
+              <p className="mt-1 text-xs text-slate-400">Search an existing compounder by name, email, or phone and send an invitation.</p>
+            </div>
+            <div className="relative">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300" size={17} />
+              <input value={compounderSearch} onChange={event => setCompounderSearch(event.target.value)} placeholder="Search compounders..." className="w-full rounded-xl border border-slate-200 py-3 pl-11 pr-4 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100" />
+              {isSearching && <Loader2 className="absolute right-3.5 top-1/2 -translate-y-1/2 animate-spin text-teal-600" size={17} />}
+            </div>
+            {searchResults.length > 0 && (
+              <div className="mt-3 divide-y divide-slate-100 rounded-xl border border-slate-100">
+                {searchResults.map(result => (
+                  <div key={result._id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="font-bold text-slate-800">{result.fullName}</p>
+                      <p className="text-xs text-slate-400">{result.email} · {result.phoneNumber}</p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={result.linked || result.pending || actionLoading === result._id + '-invite'}
+                      onClick={() => sendInvitation(result._id)}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-teal-600 px-4 py-2 text-xs font-bold text-white disabled:bg-slate-200 disabled:text-slate-500"
+                    >
+                      {actionLoading === result._id + '-invite' ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                      {result.linked ? 'Connected' : result.pending ? 'Invitation Sent' : 'Send Invitation'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {errorMsg && !isModalOpen && <p className="mt-3 text-xs font-semibold text-red-600">{errorMsg}</p>}
+          </section>
+
           <Loader2 className="w-10 h-10 text-teal-600 animate-spin mb-4" />
           <p className="text-slate-500 font-medium">Retrieving staff members...</p>
         </div>

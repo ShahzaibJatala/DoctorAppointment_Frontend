@@ -7,9 +7,11 @@ import {
 import axios from 'axios';
 import { getToken } from '@/app/actions/token';
 import DashboardShell from '@/components/layouts/DashboardShell';
+import { downloadPdf } from '@/lib/downloadPdf';
 
 export default function MedicalHistory() {
   const [activeTab, setActiveTab] = useState<'Timeline' | 'Prescriptions'>('Timeline');
+  const [historyView, setHistoryView] = useState<'Visits' | 'Conditions' | 'Prescriptions' | 'Reports'>('Visits');
   const [showPrivacyBanner, setShowPrivacyBanner] = useState(true);
   const [expandedRecord, setExpandedRecord] = useState<string | null>(null);
   const [profile, setProfile] = useState<any>(null);
@@ -44,6 +46,12 @@ export default function MedicalHistory() {
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>, recordId: string) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
+    const invalidFile = Array.from(files).find(file => file.type !== 'application/pdf' || !file.name.toLowerCase().endsWith('.pdf'));
+    if (invalidFile) {
+      alert('Only PDF report files are allowed.');
+      e.target.value = '';
+      return;
+    }
     setIsUploading(recordId);
 
     try {
@@ -79,13 +87,19 @@ export default function MedicalHistory() {
 
   const patientName = profile?.fullName || profile?.email?.split('@')[0] || 'Patient';
   const medicalRecords = profile?.medicalRecords || [];
+  const visibleRecords = medicalRecords.filter((record: any) => {
+    if (historyView === 'Conditions') return Boolean(record.reasonForVisit);
+    if (historyView === 'Reports') return Boolean(record.reports?.length);
+    return true;
+  });
 
   const stats = [
-    { label: 'Total Visits', value: String(medicalRecords.length).padStart(2, '0'), icon: Calendar, color: 'text-blue-600', bg: 'bg-blue-50' },
-    { label: 'Conditions', value: String(new Set(medicalRecords.map((r: any) => r.reasonForVisit)).size).padStart(2, '0'), icon: Activity, color: 'text-rose-500', bg: 'bg-rose-50' },
-    { label: 'Prescriptions', value: String(medicalRecords.filter((r: any) => r.prescription).length).padStart(2, '0'), icon: Pill, color: 'text-[#16BCC8]', bg: 'bg-[#16BCC8]/8' },
+    { label: 'Total Visits', view: 'Visits' as const, value: String(medicalRecords.length).padStart(2, '0'), icon: Calendar, color: 'text-blue-600', bg: 'bg-blue-50' },
+    { label: 'Conditions', view: 'Conditions' as const, value: String(new Set(medicalRecords.map((r: any) => r.reasonForVisit)).size).padStart(2, '0'), icon: Activity, color: 'text-rose-500', bg: 'bg-rose-50' },
+    { label: 'Prescriptions', view: 'Prescriptions' as const, value: String(medicalRecords.filter((r: any) => r.prescription).length).padStart(2, '0'), icon: Pill, color: 'text-[#16BCC8]', bg: 'bg-[#16BCC8]/8' },
     { 
       label: 'Reports File', 
+      view: 'Reports' as const,
       value: String(medicalRecords.reduce((acc: number, r: any) => acc + (r.reports?.length || 0), 0)).padStart(2, '0'), 
       icon: FileBarChart, 
       color: 'text-amber-500', 
@@ -134,7 +148,12 @@ export default function MedicalHistory() {
           {/* Stats Grid */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {stats.map((stat, i) => (
-              <div key={i} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-card flex items-center gap-4 hover:shadow-elevated hover:-translate-y-0.5 transition-all duration-300">
+              <button
+                type="button"
+                key={i}
+                onClick={() => { setHistoryView(stat.view); setActiveTab(stat.view === 'Prescriptions' ? 'Prescriptions' : 'Timeline'); }}
+                className={`w-full text-left bg-white p-5 rounded-2xl border shadow-card flex items-center gap-4 hover:shadow-elevated hover:-translate-y-0.5 transition-all duration-300 ${historyView === stat.view ? 'border-[#16BCC8] ring-2 ring-[#16BCC8]/10' : 'border-slate-100'}`}
+              >
                 <div className={`p-3 rounded-xl ${stat.bg}`}>
                   <stat.icon className={`w-5 h-5 ${stat.color}`} />
                 </div>
@@ -142,7 +161,7 @@ export default function MedicalHistory() {
                   <h3 className="text-xl font-extrabold text-slate-800">{stat.value}</h3>
                   <p className="text-xs text-slate-400 font-medium">{stat.label}</p>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
 
@@ -171,8 +190,8 @@ export default function MedicalHistory() {
               {/* Vertical Line */}
               <div className="absolute left-6 sm:left-[140px] top-4 bottom-4 w-px bg-slate-100 hidden sm:block"></div>
 
-              {medicalRecords.length > 0 ? (
-                [...medicalRecords].reverse().map((record: any, index) => {
+              {visibleRecords.length > 0 ? (
+                [...visibleRecords].reverse().map((record: any, index) => {
                   const recordKey = record._id || String(index);
                   return (
                     <div key={recordKey} className="relative flex flex-col sm:flex-row gap-6 sm:gap-12 group">
@@ -234,12 +253,10 @@ export default function MedicalHistory() {
                               {record.reports && record.reports.length > 0 ? (
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                   {record.reports.map((url: string, uIdx: number) => (
-                                    <a 
+                                    <button
+                                      type="button"
                                       key={uIdx} 
-                                      href={url} 
-                                      download={`report-${uIdx + 1}.pdf`}
-                                      target="_blank" 
-                                      rel="noopener noreferrer" 
+                                      onClick={() => void downloadPdf(url, `report-${uIdx + 1}.pdf`)}
                                       className="flex items-center gap-2.5 p-3 rounded-xl border border-slate-100 bg-slate-50 hover:bg-[#16BCC8]/5 hover:border-[#16BCC8]/25 transition-all group/link"
                                     >
                                       <div className="p-2 rounded-lg bg-rose-50 text-rose-500 shrink-0">
@@ -250,7 +267,7 @@ export default function MedicalHistory() {
                                         <p className="text-[10px] text-slate-400">Click to download PDF</p>
                                       </div>
                                       <Download size={14} className="text-slate-400 group-hover/link:text-rose-600 transition-colors" />
-                                    </a>
+                                    </button>
                                   ))}
                                 </div>
                               ) : (

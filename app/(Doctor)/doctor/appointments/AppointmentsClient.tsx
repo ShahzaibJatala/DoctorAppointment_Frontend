@@ -11,7 +11,9 @@ import { getToken } from "@/app/actions/token";
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
 import { setAppointmentStatus as setReduxStatus, AppointmentStatus as ReduxStatus } from "@/lib/redux/features/appointment/appointmentSlice";
 import DashboardShell from '@/components/layouts/DashboardShell';
+import { downloadPdf } from '@/lib/downloadPdf';
 
+import VideoConsultationRoom from '@/components/video/VideoConsultationRoom';
 // --- Types ---
 type AppointmentStatus = ReduxStatus;
 type AppointmentType = 'In-Clinic' | 'Video';
@@ -25,6 +27,7 @@ interface Appointment {
   gender: string;
   avatar: string;
   date: string;
+  startTime: string;
   time: string;
   type: AppointmentType;
   reason: string;
@@ -35,6 +38,9 @@ interface Appointment {
   medicalRecords?: any[];
   paymentMethod?: string;
   bankTransferReceiptUrl?: string;
+  videoConsultationMethod?: 'platform' | 'whatsapp';
+  videoCallStatus?: string;
+  videoRecordingUrl?: string;
 }
 
 // --- Props ---
@@ -106,7 +112,7 @@ const saveOverride = (id: string, data: AppointmentOverride) => {
 export default function AppointmentsClient({ specialization }: AppointmentsClientProps) {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'All' | 'Upcoming' | 'Completed' | 'Cancelled'>('All');
+  const [activeTab, setActiveTab] = useState<'All' | 'Today' | 'Upcoming' | 'Completed' | 'Cancelled'>('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -121,6 +127,7 @@ export default function AppointmentsClient({ specialization }: AppointmentsClien
   const [uploadedReports, setUploadedReports] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
 
+  const [showRecording, setShowRecording] = useState(false);
   const dispatch = useAppDispatch();
   const reduxStatus = useAppSelector((state) => state.appointment.status);
 
@@ -161,21 +168,25 @@ export default function AppointmentsClient({ specialization }: AppointmentsClien
         return {
           id: patient.appointmentId || patient._id,
           patientUserId: patient._id,
-          patientName: patient.name || patient.email.split('@')[0],
-          age: patient.age || 'N/A',
-          gender: patient.gender || 'Unspecified',
+          patientName: patient.patientName || patient.name || patient.email.split('@')[0],
+          age: patient.patientAge || patient.age || 'N/A',
+          gender: patient.patientGender || patient.gender || 'Unspecified',
           avatar: patient.profilePictureUrl || `https://ui-avatars.com/api/?name=${patient.name || 'P'}&background=0D8ABC&color=fff`,
           date: formatDate(patient.startTime),
+          startTime: patient.startTime,
           time: `${formatTime(patient.startTime)} - ${formatTime(patient.endTime)}`,
-          type: 'In-Clinic',
+          type: ['video', 'online'].includes(String(patient.appointmentType || '').toLowerCase()) ? 'Video' : 'In-Clinic',
           reason: patient.reasonForVisit || specialization,
           status: normalizedStatus,
-          phone: patient.phone || 'No phone provided',
+          phone: patient.patientPhone || patient.phoneNumber || patient.phone || 'No phone provided',
           prescription: patient.prescription || '',
           medicalRecords: patient.medicalRecords || [],
           patientDocId: patient.patientDocId,
           paymentMethod: patient.paymentMethod,
           bankTransferReceiptUrl: patient.bankTransferReceiptUrl,
+          videoConsultationMethod: patient.videoConsultationMethod,
+          videoCallStatus: patient.videoCallStatus,
+          videoRecordingUrl: patient.videoRecordingUrl,
         };
       });
 
@@ -203,6 +214,12 @@ export default function AppointmentsClient({ specialization }: AppointmentsClien
   const handleUploadReport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
+    const invalidFile = Array.from(files).find(file => file.type !== 'application/pdf' || !file.name.toLowerCase().endsWith('.pdf'));
+    if (invalidFile) {
+      alert('Only PDF report files are allowed.');
+      e.target.value = '';
+      return;
+    }
     setIsUploading(true);
 
     try {
@@ -322,7 +339,10 @@ export default function AppointmentsClient({ specialization }: AppointmentsClien
   };
 
   const filteredAppointments = appointments.filter(apt => {
-    const matchesTab = activeTab === 'All' ? true : apt.status === activeTab;
+    const appointmentDate = new Date(apt.startTime);
+    const today = new Date();
+    const isToday = appointmentDate.toDateString() === today.toDateString();
+    const matchesTab = activeTab === 'All' ? true : activeTab === 'Today' ? isToday : apt.status === activeTab;
     const matchesSearch = apt.patientName.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesTab && matchesSearch;
   });
@@ -332,7 +352,7 @@ export default function AppointmentsClient({ specialization }: AppointmentsClien
   const paginatedAppointments = filteredAppointments.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   return (
-    <DashboardShell role="doctor" activeHref="/doctor/appointments" sidebarWidth="narrow" showHealthTip={false}>
+    <DashboardShell role="doctor" activeHref="/doctor/appointments" showHealthTip={false}>
         <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-lg border-b border-slate-200 px-4 sm:px-6 py-4">
           <h1 className="text-lg sm:text-xl font-bold text-slate-800">Appointments Manager</h1>
           <p className="text-xs text-teal-600 font-medium mt-0.5 flex items-center gap-1.5">
@@ -346,7 +366,7 @@ export default function AppointmentsClient({ specialization }: AppointmentsClien
           {/* Controls */}
           <div className="flex flex-col md:flex-row justify-between gap-4">
             <div className="flex overflow-x-auto bg-slate-100 p-1 rounded-lg self-start scrollbar-hide w-full md:w-auto">
-              {(['All', 'Upcoming', 'Completed', 'Cancelled'] as const).map(tab => (
+              {(['All', 'Today', 'Upcoming', 'Completed', 'Cancelled'] as const).map(tab => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -559,6 +579,33 @@ export default function AppointmentsClient({ specialization }: AppointmentsClien
                 </div>
 
                 {/* Bank Transfer Receipt */}
+                {currentApt.type === 'Video' && (
+                  <div className="rounded-xl border border-teal-100 bg-teal-50/40 p-4">
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Patient's selected video method</p>
+                    <p className="mt-1 font-bold text-slate-800">{currentApt.videoConsultationMethod === 'whatsapp' ? 'WhatsApp Video Call' : 'Video on this platform'}</p>
+                    <div className="mt-3 flex flex-wrap items-center gap-3">
+                      {currentApt.videoConsultationMethod === 'whatsapp' ? (
+                        <a href={`https://wa.me/92${String(currentApt.phone || '').replace(/\D/g, '').replace(/^0/, '')}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white">
+                          Contact on WhatsApp
+                        </a>
+                      ) : (
+                        <VideoConsultationRoom appointmentId={currentApt.id} role="doctor" otherPartyName={currentApt.patientName} consultationMethod={currentApt.videoConsultationMethod} />
+                      )}
+                      {currentApt.videoRecordingUrl && (
+                        <button onClick={() => setShowRecording(value => !value)} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700">
+                          {showRecording ? 'Hide Consultation Video' : 'Video Consultation Booking'}
+                        </button>
+                      )}
+                    </div>
+                    {showRecording && currentApt.videoRecordingUrl && (
+                      <video controls preload="metadata" className="mt-4 max-h-80 w-full rounded-xl bg-black">
+                        <source src={currentApt.videoRecordingUrl} />
+                      </video>
+                    )}
+                    <p className="mt-3 text-xs text-slate-500">Patient: {currentApt.patientName} · {currentApt.age} years · {currentApt.gender} · {currentApt.phone}</p>
+                  </div>
+                )}
+
                 {currentApt.paymentMethod === 'bank_transfer' && (
                   <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl">
                     <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
@@ -613,12 +660,10 @@ export default function AppointmentsClient({ specialization }: AppointmentsClien
                         <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Saved Reports</p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           {allReports.map((url: string, uIdx: number) => (
-                            <a
+                            <button
+                              type="button"
                               key={uIdx}
-                              href={url}
-                              download={`report-${uIdx + 1}.pdf`}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                              onClick={() => void downloadPdf(url, `report-${uIdx + 1}.pdf`)}
                               className="flex items-center gap-2 p-3 rounded-xl border border-slate-100 bg-slate-50 hover:bg-teal-50 hover:border-teal-200 transition-all group"
                             >
                               <div className="p-1.5 rounded-lg bg-rose-50 shrink-0">
@@ -626,7 +671,7 @@ export default function AppointmentsClient({ specialization }: AppointmentsClien
                               </div>
                               <span className="text-xs font-semibold text-slate-700 truncate flex-1">Report #{uIdx + 1}.pdf</span>
                               <span className="text-[10px] text-teal-600 font-bold group-hover:underline shrink-0">↓ Download</span>
-                            </a>
+                            </button>
                           ))}
                         </div>
                       </div>
@@ -639,18 +684,16 @@ export default function AppointmentsClient({ specialization }: AppointmentsClien
                       <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Just Uploaded (Session)</p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {uploadedReports.map((url, uIdx) => (
-                          <a
+                          <button
+                            type="button"
                             key={uIdx}
-                            href={url}
-                            download={`new-report-${uIdx + 1}.pdf`}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                            onClick={() => void downloadPdf(url, `new-report-${uIdx + 1}.pdf`)}
                             className="flex items-center gap-2 p-3 rounded-xl border border-teal-100 bg-teal-50/50 group"
                           >
                             <FileText size={16} className="text-teal-500 shrink-0" />
                             <span className="text-xs font-semibold text-slate-700 truncate flex-1">New Report #{uIdx + 1}.pdf</span>
                             <span className="text-[10px] text-teal-600 font-bold group-hover:underline shrink-0">↓ Download</span>
-                          </a>
+                          </button>
                         ))}
                       </div>
                     </div>

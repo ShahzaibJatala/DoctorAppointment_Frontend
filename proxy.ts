@@ -23,6 +23,7 @@ export function proxy(request: NextRequest) {
   if (
     pathname.startsWith('/_next') || 
     pathname.startsWith('/api') || 
+    pathname === '/auth/google/callback' ||
     pathname.startsWith('/static') || 
     pathname === '/login' || 
     pathname === '/register' ||

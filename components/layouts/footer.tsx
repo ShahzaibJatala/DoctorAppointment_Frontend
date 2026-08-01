@@ -24,8 +24,8 @@ const Footer = () => {
       {/* Decorative gradient line */}
       <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#16BCC8]/30 to-transparent" />
 
-      <div className="container mx-auto px-4 py-14 lg:py-16">
-        <div className="grid gap-10 md:grid-cols-2 lg:grid-cols-4">
+      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-10 sm:py-14 lg:py-16">
+        <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4 lg:gap-10">
           {/* Brand */}
           <div className="space-y-5 lg:col-span-1">
             <Link href="/" className="inline-flex items-center gap-2.5 group">
@@ -96,7 +96,7 @@ const Footer = () => {
           </div>
 
           {/* Contact */}
-          <div>
+          <div className="min-w-0">
             <h4 className="mb-5 text-sm font-semibold text-slate-800 uppercase tracking-wider">
               Contact Us
             </h4>
@@ -105,9 +105,9 @@ const Footer = () => {
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#16BCC8]/8 text-[#16BCC8] transition-all duration-200 group-hover:bg-[#16BCC8]/15 group-hover:scale-105">
                   <Mail className="h-3.5 w-3.5" />
                 </div>
-                <span>support@medibook.com</span>
+                <span className="break-all">support@medibook.com</span>
               </li>
-              <li className="group flex items-center gap-3 text-sm text-slate-500 transition-colors hover:text-slate-700">
+              <li className="group flex min-w-0 items-center gap-3 text-sm text-slate-500 transition-colors hover:text-slate-700">
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#16BCC8]/8 text-[#16BCC8] transition-all duration-200 group-hover:bg-[#16BCC8]/15 group-hover:scale-105">
                   <Phone className="h-3.5 w-3.5" />
                 </div>
@@ -124,11 +124,11 @@ const Footer = () => {
         </div>
 
         {/* Bottom Bar */}
-        <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-slate-100 pt-8 sm:flex-row">
+        <div className="mt-10 flex flex-col items-center justify-between gap-5 border-t border-slate-100 pt-6 text-center sm:mt-12 sm:flex-row sm:pt-8 sm:text-left">
           <p className="text-sm text-slate-400">
             © {currentYear} MediBook. All rights reserved.
           </p>
-          <div className="flex items-center gap-6">
+          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 sm:justify-end">
             {["Privacy Policy", "Terms of Service", "Cookie Settings"].map((text) => (
               <Link
                 key={text}

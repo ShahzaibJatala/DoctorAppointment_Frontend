@@ -1,4 +1,4 @@
-import Footer from "@/components/layouts/footer";
+import PatientFooter from "@/components/layouts/PatientFooter";
 import Header from "@/components/layouts/header";
 import { PropsWithChildren } from "react";
 
@@ -8,7 +8,7 @@ export default function RootLayout({children} : PropsWithChildren) {
     <>
         {/* <header><Header /></header> */}
          {children}
-        <footer><Footer /></footer>
+        <PatientFooter />
         
     </>
     )

@@ -19,16 +19,6 @@ type TimePeriod = 'Morning' | 'Afternoon' | 'Evening';
 type TimeSlot = { time: string; period: TimePeriod };
 type DayOption = { label: string; dayName: string; fullDayName: string; date: Date; display: string };
 
-const services = [
-  "Echocardiography", "Cardiac Catheterization", "Angioplasty",
-  "Hypertension Management", "Heart Failure Treatment", "Pacemaker Implantation"
-];
-
-const reviews = [
-  { id: '1', user: 'Michael R.', rating: 5, date: '2 days ago', comment: 'Very thorough and kind. Took the time to explain everything clearly.' },
-  { id: '2', user: 'Emily W.', rating: 5, date: '1 week ago', comment: 'Excellent experience. The clinic is modern and the staff is friendly. Highly recommended.' },
-  { id: '3', user: 'David K.', rating: 4, date: '3 weeks ago', comment: 'Great doctor, but the wait time was a bit longer than expected.' },
-];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function getNextSevenDays(): DayOption[] {
@@ -141,6 +131,9 @@ export default function DoctorProfile() {
   const [doctor, setDoctor] = useState<any>(null);
   const [bookedAppointments, setBookedAppointments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
   // Booking flow state
   const [step, setStep] = useState<BookingStep>('datetime');
@@ -200,11 +193,24 @@ export default function DoctorProfile() {
 
   const fee = useMemo(() => {
     if (!doctor) return 100;
-    const dbFee = doctor.consultationFee || 100;
-    return bookingType === 'Clinic' ? dbFee : Math.round(dbFee * 0.8);
+    const clinicFee = Number(doctor.consultationFee ?? 0);
+    const videoFee = Number(doctor.videoConsultationFee ?? 0);
+    return bookingType === 'Clinic' ? clinicFee : videoFee;
   }, [doctor, bookingType]);
 
+  const services = doctor?.services?.length
+    ? doctor.services
+    : [doctor?.specialization || 'General Consultation'];
+
   // Retrieve already booked appointment slot strings for the selected date
+
+  const reviews = (doctor?.reviews || []).map((review: any) => ({
+    id: review._id,
+    user: review.userName || 'Patient',
+    rating: review.rating,
+    date: review.createdAt ? new Date(review.createdAt).toLocaleDateString() : '',
+    comment: review.comment,
+  }));
   const bookedTimesForSelectedDay = useMemo(() => {
     const selectedDate = days[selectedDayIdx].date;
     return bookedAppointments
@@ -367,7 +373,7 @@ export default function DoctorProfile() {
         {/* Fee */}
         <div className="flex justify-between items-center mb-5 pb-4 border-b border-slate-100">
           <span className="text-sm text-slate-500 font-medium">Consultation Fee</span>
-          <span className="text-xl font-extrabold text-teal-700">${fee}</span>
+          <span className="text-xl font-extrabold text-teal-700">PKR {fee}</span>
         </div>
 
         {/* Date selector */}
@@ -471,7 +477,7 @@ export default function DoctorProfile() {
             </div>
             <div className="border-t border-teal-100 my-2 pt-2 flex justify-between">
               <span className="font-bold text-slate-700">Total</span>
-              <span className="font-extrabold text-teal-700 text-base">${fee}</span>
+              <span className="font-extrabold text-teal-700 text-base">PKR {fee}</span>
             </div>
           </div>
         </div>
@@ -548,7 +554,7 @@ export default function DoctorProfile() {
         {paymentMethod === 'cash' && (
           <div className="mb-5 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
             <p className="font-semibold mb-1">Pay at the clinic</p>
-            <p className="text-amber-700 text-xs">Please arrive 10 minutes early and bring <strong>${fee}</strong> in cash.</p>
+            <p className="text-amber-700 text-xs">Please arrive 10 minutes early and bring <strong>PKR {fee}</strong> in cash.</p>
           </div>
         )}
 
@@ -563,7 +569,7 @@ export default function DoctorProfile() {
           disabled={isSubmitting || (paymentMethod === 'card' && (!cardName || cardNumber.length < 19 || cardExpiry.length < 5 || cardCVV.length < 3))}
           className="w-full py-3.5 rounded-xl font-bold text-white bg-teal-600 hover:bg-teal-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-all shadow-md flex items-center justify-center gap-2"
         >
-          {isSubmitting ? <><Loader2 size={18} className="animate-spin" /> Processing…</> : `Confirm & Pay $${fee}`}
+          {isSubmitting ? <><Loader2 size={18} className="animate-spin" /> Processing…</> : `Confirm & Pay PKR ${fee}`}
         </button>
 
         <button
@@ -604,7 +610,7 @@ export default function DoctorProfile() {
           <div className="flex items-center gap-3">
             <CreditCard size={15} className="text-teal-600 shrink-0" />
             <span className="text-slate-700">
-              <span className="font-semibold">Payment:</span> ${fee} · {paymentMethod === 'card' ? 'Card' : 'Pay at Clinic'}
+              <span className="font-semibold">Payment:</span> PKR {fee} · {paymentMethod === 'card' ? 'Card' : 'Pay at Clinic'}
             </span>
           </div>
         </div>
@@ -619,8 +625,35 @@ export default function DoctorProfile() {
     );
   };
 
+  const handleSubmitReview = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!reviewComment.trim()) return;
+    setIsSubmittingReview(true);
+    try {
+      const token = await getToken();
+      if (!token) throw new Error('Please log in to submit a review.');
+      const cleanToken = token.replace(/"/g, '').trim();
+      const response = await axios.post(
+        `${serverUrl}/patient/doctor-reviews/${doctorId}`,
+        { rating: reviewRating, comment: reviewComment.trim() },
+        { headers: { Authorization: `Bearer ${cleanToken}` } },
+      );
+      const updatedDoctor = response.data;
+      const updatedReviews = updatedDoctor.reviews || [];
+      const rating = updatedReviews.length
+        ? Number((updatedReviews.reduce((sum: number, review: any) => sum + review.rating, 0) / updatedReviews.length).toFixed(1))
+        : 0;
+      setDoctor({ ...updatedDoctor, rating, reviewCount: updatedReviews.length });
+      setReviewComment('');
+    } catch (error: any) {
+      alert(error.response?.data?.message || error.message || 'Could not submit review.');
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  };
   if (isLoading) {
     return (
+
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center py-40">
         <Loader2 className="w-10 h-10 text-[#16BCC8] animate-spin mb-4" />
         <p className="text-slate-500 font-medium font-sans">Loading doctor profile...</p>
@@ -695,8 +728,8 @@ export default function DoctorProfile() {
                 <div className="flex flex-wrap gap-3">
                   <div className="flex items-center gap-1.5 text-sm text-slate-600 bg-slate-50 px-3 py-1.5 rounded-lg">
                     <Star size={15} className="text-yellow-500 fill-yellow-500" />
-                    <span className="font-bold">{doctor.rating || 4.9}</span>
-                    <span className="text-slate-400">({doctor.reviewCount || 120})</span>
+                    <span className="font-bold">{doctor.rating ?? 0}</span>
+                    <span className="text-slate-400">({doctor.reviewCount ?? 0})</span>
                   </div>
                   <div className="flex items-center gap-1.5 text-sm text-slate-600 bg-slate-50 px-3 py-1.5 rounded-lg">
                     <BriefcaseIcon className="text-teal-600" />
@@ -748,7 +781,7 @@ export default function DoctorProfile() {
           <section className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
             <SectionTitle title="Specializations & Services" />
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {services.map((service, idx) => (
+              {services.map((service: string, idx: number) => (
                 <div key={idx} className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 hover:border-teal-200 hover:bg-teal-50/50 transition-colors group">
                   <div className="p-2 bg-teal-50 text-teal-600 rounded-lg group-hover:bg-teal-100 transition-colors">
                     <Stethoscope size={16} />
@@ -779,8 +812,15 @@ export default function DoctorProfile() {
                   </div>
                 </div>
               </div>
-              <div className="w-full md:w-64 h-40 bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl flex items-center justify-center text-slate-400 border border-slate-200">
-                <span className="flex items-center gap-2"><MapPin size={16} /> Map View</span>
+              <div className="w-full md:w-80 overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
+                {doctor.clinicLatitude != null && doctor.clinicLongitude != null ? (
+                  <>
+                    <iframe title={`${doctor.clinicName || 'Clinic'} location`} src={`https://www.google.com/maps?q=${doctor.clinicLatitude},${doctor.clinicLongitude}&z=16&output=embed`} className="h-44 w-full" loading="lazy" referrerPolicy="no-referrer-when-downgrade" />
+                    <a href={`https://www.google.com/maps/search/?api=1&query=${doctor.clinicLatitude},${doctor.clinicLongitude}`} target="_blank" rel="noreferrer" className="block bg-white px-3 py-2 text-center text-xs font-bold text-teal-700">Open in Google Maps</a>
+                  </>
+                ) : (
+                  <div className="flex h-40 items-center justify-center text-slate-400"><span className="flex items-center gap-2"><MapPin size={16} /> Location not added</span></div>
+                )}
               </div>
             </div>
           </section>
@@ -789,10 +829,34 @@ export default function DoctorProfile() {
           <section className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
             <div className="flex items-center justify-between mb-6">
               <SectionTitle title="Patient Reviews" />
-              <button className="text-sm font-medium text-teal-600 hover:underline">View All</button>
+              <span className="text-sm font-medium text-slate-500">{reviews.length} reviews</span>
             </div>
+            <form onSubmit={handleSubmitReview} className="mb-7 rounded-2xl border border-teal-100 bg-teal-50/40 p-4 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-bold text-slate-700">Share your experience</p>
+                <div className="flex gap-1">
+                  {[1, 2, 3, 4, 5].map(value => (
+                    <button key={value} type="button" onClick={() => setReviewRating(value)} aria-label={`${value} stars`}>
+                      <Star size={18} className={value <= reviewRating ? 'text-amber-400 fill-amber-400' : 'text-slate-300'} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <textarea
+                value={reviewComment}
+                onChange={event => setReviewComment(event.target.value)}
+                required
+                rows={3}
+                placeholder="Write your review..."
+                className="w-full rounded-xl border border-slate-200 bg-white p-3 text-sm focus:border-teal-400 focus:outline-none"
+              />
+              <button disabled={isSubmittingReview} className="rounded-xl bg-teal-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-60">
+                {isSubmittingReview ? 'Submitting...' : 'Submit Review'}
+              </button>
+            </form>
             <div className="space-y-6">
-              {reviews.map(review => (
+              {reviews.length === 0 && <p className="text-sm text-slate-400">No reviews yet. Be the first to review this doctor.</p>}
+              {reviews.map((review: { id: string; user: string; rating: number; date: string; comment: string }) => (
                 <div key={review.id} className="border-b border-slate-100 last:border-0 pb-6 last:pb-0">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-3">

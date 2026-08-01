@@ -9,12 +9,12 @@ import {
   Filter, 
   Calendar, 
   Stethoscope, 
-  DollarSign,
   ChevronRight,
   Sparkles,
   ArrowRight,
   SlidersHorizontal,
-  X
+  X,
+  Loader2
 } from 'lucide-react';
 import { getToken } from '@/app/actions/token';
 
@@ -33,6 +33,13 @@ type Doctor = {
   consultationFee?: number;
   nextAvailable?: string;
   languages?: string[];
+
+};
+
+type SearchSuggestion = {
+  label: string;
+  type: 'Doctor' | 'Specialization' | 'Service' | 'City' | 'Province';
+  value: string;
 };
 
 
@@ -41,10 +48,15 @@ type Doctor = {
 const specialties = ['All', 'Cardiology', 'Neurology', 'Pediatrics', 'Orthopedics', 'Dermatology', 'Psychiatry'];
 
 export default function FindDoctorPage() {
+  const [locationQuery, setLocationQuery] = useState('');
+  const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSpecialty, setSelectedSpecialty] = useState('All');
   const [mockDoctors, setMockDoctors] = useState<Doctor[]>([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL;
 
@@ -70,29 +82,82 @@ export default function FindDoctorPage() {
     } catch (error) {
       console.error("Error fetching all doctors:", error);
       return [];
+    } finally {
+      setIsLoading(false);
     }
   }
+
+  async function searchDoctors() {
+    setIsLoading(true);
+    setShowSuggestions(false);
+    try {
+      const params = new URLSearchParams();
+      if (searchQuery.trim()) params.set('q', searchQuery.trim());
+      if (locationQuery.trim()) params.set('location', locationQuery.trim());
+      if (selectedSpecialty !== 'All') params.set('specialty', selectedSpecialty);
+      const response = await fetch(`${serverUrl}/patient/search-doctors?${params.toString()}`, { cache: 'no-store' });
+      if (!response.ok) throw new Error(`Search failed: ${response.status}`);
+      setMockDoctors(await response.json());
+      setCurrentPage(1);
+    } catch (error) {
+      console.error('Doctor search failed:', error);
+      setMockDoctors([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    const query = searchQuery.trim();
+    if (query.length < 2) {
+      setSuggestions([]);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await fetch(
+          `${serverUrl}/patient/doctor-search-suggestions?q=${encodeURIComponent(query)}`,
+          { signal: controller.signal, cache: 'no-store' },
+        );
+        if (response.ok) {
+          setSuggestions(await response.json());
+          setShowSuggestions(true);
+        }
+      } catch (error) {
+        if ((error as Error).name !== 'AbortError') console.error('Autocomplete failed:', error);
+      }
+    }, 300);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [searchQuery, serverUrl]);
+
+  const selectSuggestion = (suggestion: SearchSuggestion) => {
+    if (suggestion.type === 'City' || suggestion.type === 'Province') {
+      setLocationQuery(suggestion.value);
+    } else {
+      setSearchQuery(suggestion.value);
+    }
+    setShowSuggestions(false);
+  };
  
   useEffect(() => {
     getAllDoctors();
   }, []);
 
-  // --- Filtering Logic ---
-  const filteredDoctors = mockDoctors.filter((doc: Doctor) => {
-    const docName = doc.name || doc.fullName || '';
-    const docSpecialization = doc.specialization || '';
-    const docLocation = doc.clinicAddress || doc.city || '';
+  const filteredDoctors = mockDoctors;
 
-    const searchLower = searchQuery.toLowerCase();
-    const matchesSearch = 
-      docName.toLowerCase().includes(searchLower) || 
-      docSpecialization.toLowerCase().includes(searchLower) ||
-      docLocation.toLowerCase().includes(searchLower);
-    
-    const matchesSpecialty = selectedSpecialty === 'All' || docSpecialization === selectedSpecialty;    
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedSpecialty]);
 
-    return matchesSearch && matchesSpecialty;
-  });
+  const PAGE_SIZE = 10;
+  const totalPages = Math.ceil(filteredDoctors.length / PAGE_SIZE);
+  const paginatedDoctors = filteredDoctors.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   return (
     <div className="min-h-screen bg-white">
@@ -117,30 +182,49 @@ export default function FindDoctorPage() {
           <p className="text-white/60 text-lg mb-8 max-w-2xl mx-auto">Search by name, specialty, or location to find your perfect match</p>
           
           {/* Main Search Bar */}
-          <div className="max-w-3xl mx-auto bg-white/95 backdrop-blur-sm p-2.5 rounded-2xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.2)] flex flex-col md:flex-row gap-2">
-            <div className="flex-1 flex items-center px-4 py-2.5 rounded-xl hover:bg-slate-50 transition-colors">
+          <form onSubmit={(event) => { event.preventDefault(); void searchDoctors(); }} className="max-w-3xl mx-auto bg-white/95 backdrop-blur-sm p-2.5 rounded-2xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.2)] flex flex-col md:flex-row gap-2">
+            <div className="relative flex-1 flex items-center px-4 py-2.5 rounded-xl hover:bg-slate-50 transition-colors">
               <Search className="text-slate-300 w-5 h-5 mr-3 shrink-0" />
-              <input 
-                type="text" 
-                placeholder="Search doctors, specialties, or symptoms..." 
+              <input
+                type="text"
+                placeholder="Search doctors, specialties, or symptoms..."
                 className="w-full bg-transparent border-none outline-none text-slate-700 placeholder:text-slate-300 text-sm"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+                autoComplete="off"
               />
+              {showSuggestions && suggestions.length > 0 && (
+                <div className="absolute left-0 right-0 top-[calc(100%+12px)] z-50 overflow-hidden rounded-xl border border-slate-100 bg-white text-left shadow-xl">
+                  {suggestions.map((suggestion) => (
+                    <button
+                      type="button"
+                      key={`${suggestion.type}-${suggestion.value}`}
+                      onClick={() => selectSuggestion(suggestion)}
+                      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-sm hover:bg-teal-50"
+                    >
+                      <span className="font-medium text-slate-700">{suggestion.label}</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wide text-teal-600">{suggestion.type}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-            <div className="hidden md:block w-px bg-slate-100 my-2"></div>
+            <div className="hidden md:block w-px bg-slate-100 my-2" />
             <div className="flex-1 flex items-center px-4 py-2.5 rounded-xl hover:bg-slate-50 transition-colors">
               <MapPin className="text-slate-300 w-5 h-5 mr-3 shrink-0" />
-              <input 
-                type="text" 
-                placeholder="City, state, or zip code" 
+              <input
+                type="text"
+                placeholder="City or province"
                 className="w-full bg-transparent border-none outline-none text-slate-700 placeholder:text-slate-300 text-sm"
+                value={locationQuery}
+                onChange={(event) => setLocationQuery(event.target.value)}
               />
             </div>
-            <button className="bg-gradient-to-r from-[#16BCC8] to-[#0ea5a9] hover:from-[#14b0bc] hover:to-[#0d9a9e] text-white px-8 py-3 rounded-xl font-semibold transition-all w-full md:w-auto shadow-[0_4px_16px_rgba(22,188,200,0.35)] hover:shadow-[0_6px_24px_rgba(22,188,200,0.45)]">
-              Search
+            <button type="submit" disabled={isLoading} className="bg-gradient-to-r from-[#16BCC8] to-[#0ea5a9] hover:from-[#14b0bc] hover:to-[#0d9a9e] disabled:opacity-60 text-white px-8 py-3 rounded-xl font-semibold transition-all w-full md:w-auto shadow-[0_4px_16px_rgba(22,188,200,0.35)] hover:shadow-[0_6px_24px_rgba(22,188,200,0.45)]">
+              {isLoading ? <Loader2 size={18} className="mx-auto animate-spin" /> : 'Search'}
             </button>
-          </div>
+          </form>
         </div>
       </div>
 
@@ -242,8 +326,13 @@ export default function FindDoctorPage() {
           </div>
 
           <div className="space-y-4">
-            {filteredDoctors.length > 0 ? (
-              filteredDoctors.map((doc, index) => (
+            {isLoading ? (
+              <div className="bg-white p-16 rounded-2xl border border-slate-100 text-center shadow-card">
+                <Loader2 className="w-9 h-9 text-[#16BCC8] animate-spin mx-auto mb-4" />
+                <p className="text-slate-500 font-medium">Loading doctors...</p>
+              </div>
+            ) : filteredDoctors.length > 0 ? (
+              paginatedDoctors.map((doc, index) => (
                 <div 
                   key={doc._id} 
                   className={`group bg-white p-6 rounded-2xl border border-slate-100 shadow-card hover:shadow-elevated hover:border-[#16BCC8]/15 hover:-translate-y-0.5 transition-all duration-300 flex flex-col sm:flex-row gap-6 animate-fade-up stagger-${Math.min(index + 1, 6)}`}
@@ -268,7 +357,7 @@ export default function FindDoctorPage() {
                             <MapPin size={14} className="text-slate-300" /> {doc.clinicAddress}
                           </span>
                           <span className="flex items-center gap-1.5">
-                            <DollarSign size={14} className="text-slate-300" /> ${doc.consultationFee} / visit
+                            <span className="font-semibold text-slate-500">PKR</span> {doc.consultationFee} / visit
                           </span>
                         </div>
                       </div>
@@ -317,7 +406,7 @@ export default function FindDoctorPage() {
                 <h3 className="text-lg font-bold text-slate-800 mb-2">No doctors found</h3>
                 <p className="text-slate-400 max-w-sm mx-auto">We couldn't find any doctors matching your current filters. Try adjusting your search criteria.</p>
                 <button 
-                  onClick={() => { setSearchQuery(''); setSelectedSpecialty('All'); }}
+                  onClick={() => { setSearchQuery(''); setLocationQuery(''); setSelectedSpecialty('All'); void getAllDoctors(); }}
                   className="mt-6 text-[#16BCC8] font-semibold hover:text-[#0ea5a9] transition-colors duration-200"
                 >
                   Clear all filters
@@ -327,6 +416,28 @@ export default function FindDoctorPage() {
           </div>
         </div>
 
+          {!isLoading && totalPages > 1 && (
+            <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-3 bg-white border border-slate-100 rounded-2xl px-5 py-4 shadow-card">
+              <p className="text-sm text-slate-500">
+                Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredDoctors.length)} of {filteredDoctors.length} doctors
+              </p>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(page => Math.max(1, page - 1))}
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold disabled:opacity-40"
+                >Previous</button>
+                <span className="text-sm font-semibold text-slate-600">Page {currentPage} of {totalPages}</span>
+                <button
+                  type="button"
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))}
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold disabled:opacity-40"
+                >Next</button>
+              </div>
+            </div>
+          )}
       </div>
     </div>
   );

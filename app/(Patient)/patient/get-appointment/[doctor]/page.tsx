@@ -2,10 +2,24 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import {
-  Calendar, Clock, MapPin, Video, CreditCard,
-  ChevronRight, CheckCircle2, ArrowLeft, Check,
-  Loader2, Info, Star, ShieldCheck, User, AlertCircle,
-  Building2, UploadCloud, FileImage
+  Calendar,
+  Clock,
+  MapPin,
+  Video,
+  CreditCard,
+  ChevronRight,
+  CheckCircle2,
+  ArrowLeft,
+  Check,
+  Loader2,
+  Info,
+  Star,
+  ShieldCheck,
+  User,
+  AlertCircle,
+  Building2,
+  UploadCloud,
+  FileImage,
 } from 'lucide-react';
 import axios from 'axios';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
@@ -21,12 +35,18 @@ type DayOption = { label: string; date: Date; display: string; month: string };
 
 // ─── Static time slots ────────────────────────────────────────────────────────
 const TIME_SLOTS: TimeSlot[] = [
-  { time: '09:00 AM', period: 'Morning' }, { time: '09:30 AM', period: 'Morning' },
-  { time: '10:00 AM', period: 'Morning' }, { time: '10:30 AM', period: 'Morning' },
-  { time: '11:00 AM', period: 'Morning' }, { time: '11:30 AM', period: 'Morning' },
-  { time: '02:00 PM', period: 'Afternoon' }, { time: '02:30 PM', period: 'Afternoon' },
-  { time: '03:00 PM', period: 'Afternoon' }, { time: '04:00 PM', period: 'Afternoon' },
-  { time: '06:00 PM', period: 'Evening' }, { time: '06:30 PM', period: 'Evening' },
+  { time: '09:00 AM', period: 'Morning' },
+  { time: '09:30 AM', period: 'Morning' },
+  { time: '10:00 AM', period: 'Morning' },
+  { time: '10:30 AM', period: 'Morning' },
+  { time: '11:00 AM', period: 'Morning' },
+  { time: '11:30 AM', period: 'Morning' },
+  { time: '02:00 PM', period: 'Afternoon' },
+  { time: '02:30 PM', period: 'Afternoon' },
+  { time: '03:00 PM', period: 'Afternoon' },
+  { time: '04:00 PM', period: 'Afternoon' },
+  { time: '06:00 PM', period: 'Evening' },
+  { time: '06:30 PM', period: 'Evening' },
   { time: '07:00 PM', period: 'Evening' },
 ];
 
@@ -58,8 +78,17 @@ function parseSlotToDateTime(dateObj: Date, timeStr: string): Date {
   return clone;
 }
 
-const formatCard = (v: string) => v.replace(/\D/g, '').slice(0, 16).replace(/(.{4})/g, '$1 ').trim();
-const formatExpiry = (v: string) => v.replace(/\D/g, '').slice(0, 4).replace(/^(\d{2})(\d)/, '$1/$2');
+const formatCard = (v: string) =>
+  v
+    .replace(/\D/g, '')
+    .slice(0, 16)
+    .replace(/(.{4})/g, '$1 ')
+    .trim();
+const formatExpiry = (v: string) =>
+  v
+    .replace(/\D/g, '')
+    .slice(0, 4)
+    .replace(/^(\d{2})(\d)/, '$1/$2');
 
 // ─── Step Indicator ──────────────────────────────────────────────────────────
 function StepIndicator({ step }: { step: BookingStep }) {
@@ -68,23 +97,25 @@ function StepIndicator({ step }: { step: BookingStep }) {
     { key: 'payment', label: 'Payment' },
     { key: 'confirmed', label: 'Done' },
   ];
-  const current = steps.findIndex(s => s.key === step);
+  const current = steps.findIndex((s) => s.key === step);
   return (
     <div className="flex items-center mb-8 overflow-x-auto pb-1 -mx-1 px-1">
       {steps.map((s, idx) => (
         <React.Fragment key={s.key}>
           <div className="flex flex-col items-center gap-1.5 shrink-0">
-            <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-300 ${
-              idx < current ? 'bg-teal-600 text-white' :
-              idx === current ? 'bg-teal-600 text-white ring-4 ring-teal-100' :
-              'bg-slate-100 text-slate-400'
-            }`}>
+            <div
+              className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-300 ${
+                idx < current ? 'bg-teal-600 text-white' : idx === current ? 'bg-teal-600 text-white ring-4 ring-teal-100' : 'bg-slate-100 text-slate-400'
+              }`}
+            >
               {idx < current ? <Check size={16} strokeWidth={3} /> : idx + 1}
             </div>
             <span className={`text-[10px] sm:text-xs font-semibold whitespace-nowrap ${idx <= current ? 'text-teal-700' : 'text-slate-400'}`}>{s.label}</span>
           </div>
           {idx < steps.length - 1 && (
-            <div className={`flex-1 min-w-[24px] sm:min-w-[40px] h-0.5 mx-2 sm:mx-3 mb-5 rounded-full transition-all duration-500 ${idx < current ? 'bg-teal-500' : 'bg-slate-200'}`} />
+            <div
+              className={`flex-1 min-w-[24px] sm:min-w-[40px] h-0.5 mx-2 sm:mx-3 mb-5 rounded-full transition-all duration-500 ${idx < current ? 'bg-teal-500' : 'bg-slate-200'}`}
+            />
           )}
         </React.Fragment>
       ))}
@@ -93,7 +124,13 @@ function StepIndicator({ step }: { step: BookingStep }) {
 }
 
 // ─── Time Slot Group ─────────────────────────────────────────────────────────
-function SlotGroup({ title, slots, selected, bookedSlots = [], onSelect }: {
+function SlotGroup({
+  title,
+  slots,
+  selected,
+  bookedSlots = [],
+  onSelect,
+}: {
   title: string;
   slots: TimeSlot[];
   selected: string | null;
@@ -120,8 +157,8 @@ function SlotGroup({ title, slots, selected, bookedSlots = [], onSelect }: {
                 isBooked
                   ? 'bg-slate-100 border-slate-200 text-slate-400 line-through cursor-not-allowed opacity-60'
                   : selected === slot.time
-                  ? 'bg-teal-600 border-teal-600 text-white shadow-md scale-105'
-                  : 'bg-white border-slate-200 text-slate-600 hover:border-teal-400 hover:text-teal-700 hover:bg-teal-50'
+                    ? 'bg-teal-600 border-teal-600 text-white shadow-md scale-105'
+                    : 'bg-white border-slate-200 text-slate-600 hover:border-teal-400 hover:text-teal-700 hover:bg-teal-50'
               }`}
             >
               {slot.time}
@@ -158,6 +195,7 @@ function GetAppointmentPageContent() {
   const [step, setStep] = useState<BookingStep>('datetime');
   const [bookingType, setBookingType] = useState<BookingType>('Clinic');
   const [selectedDayIdx, setSelectedDayIdx] = useState(0);
+  const [videoConsultationMethod, setVideoConsultationMethod] = useState<'platform' | 'whatsapp'>('platform');
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
 
   // Payment state
@@ -167,6 +205,13 @@ function GetAppointmentPageContent() {
   const [cardExpiry, setCardExpiry] = useState('');
   const [cardCVV, setCardCVV] = useState('');
   const [mobileWalletNumber, setMobileWalletNumber] = useState('');
+  const [patientDetails, setPatientDetails] = useState({
+    patientName: '',
+    patientAge: '',
+    patientPhone: '',
+    patientGender: '',
+  });
+
   const [bankReceiptFile, setBankReceiptFile] = useState<File | null>(null);
   const [bankReceiptPreview, setBankReceiptPreview] = useState<string | null>(null);
 
@@ -178,10 +223,43 @@ function GetAppointmentPageContent() {
   const [bookedAppointments, setBookedAppointments] = useState<any[]>([]);
 
   useEffect(() => {
-    if (doctorProfile && doctorProfile.isVideoEnabled === false) {
+    if (doctorProfile?.isVideoEnabled === false) {
       setBookingType('Clinic');
     }
+    if (doctorProfile && doctorProfile.allowWhatsAppVideoConsultation !== true) {
+      setVideoConsultationMethod('platform');
+    }
   }, [doctorProfile]);
+
+  useEffect(() => {
+    async function fetchPatientProfile() {
+      try {
+        const token = await getToken();
+        if (!token) return;
+        const response = await axios.get(`${serverUrl}/patient/my-profile`, {
+          headers: { Authorization: `Bearer ${token.replace(/"/g, '').trim()}` },
+        });
+        const profile = response.data || {};
+        let age = '';
+        if (profile.dateOfBirth) {
+          const birthDate = new Date(profile.dateOfBirth);
+          const today = new Date();
+          let calculatedAge = today.getFullYear() - birthDate.getFullYear();
+          if (today < new Date(today.getFullYear(), birthDate.getMonth(), birthDate.getDate())) calculatedAge -= 1;
+          age = String(calculatedAge);
+        }
+        setPatientDetails({
+          patientName: profile.fullName || '',
+          patientAge: age,
+          patientPhone: profile.phoneNumber || '',
+          patientGender: profile.gender || '',
+        });
+      } catch (error) {
+        console.error(error);
+      }
+    }
+    fetchPatientProfile();
+  }, [serverUrl]);
 
   useEffect(() => {
     async function fetchBookedAppointments() {
@@ -192,7 +270,7 @@ function GetAppointmentPageContent() {
         const res = await axios.get(`${serverUrl}/patient/doctor-appointments/${doctorId}`, {
           headers: {
             Authorization: `Bearer ${cleanToken}`,
-          }
+          },
         });
         setBookedAppointments(res.data);
       } catch (err) {
@@ -209,22 +287,16 @@ function GetAppointmentPageContent() {
         const sseData = JSON.parse(event.data);
         if (sseData.type === 'appointment_booked' && sseData.data.doctorId === doctorId) {
           setBookedAppointments((prev) => {
-            const exists = prev.some(
-              (app) => new Date(app.startTime).getTime() === new Date(sseData.data.startTime).getTime()
-            );
+            const exists = prev.some((app) => new Date(app.startTime).getTime() === new Date(sseData.data.startTime).getTime());
             if (exists) return prev;
             return [...prev, sseData.data];
           });
         } else if (sseData.type === 'appointment_updated' && sseData.data.doctorId === doctorId) {
           setBookedAppointments((prev) => {
             if (sseData.data.status === 'cancelled') {
-              return prev.filter(
-                (app) => new Date(app.startTime).getTime() !== new Date(sseData.data.startTime).getTime()
-              );
+              return prev.filter((app) => new Date(app.startTime).getTime() !== new Date(sseData.data.startTime).getTime());
             } else {
-              const index = prev.findIndex(
-                (app) => new Date(app.startTime).getTime() === new Date(sseData.data.startTime).getTime()
-              );
+              const index = prev.findIndex((app) => new Date(app.startTime).getTime() === new Date(sseData.data.startTime).getTime());
               if (index === -1) {
                 return [...prev, sseData.data];
               }
@@ -240,6 +312,7 @@ function GetAppointmentPageContent() {
               ...prev,
               availability: sseData.data.availability,
               isVideoEnabled: sseData.data.isVideoEnabled,
+              allowWhatsAppVideoConsultation: sseData.data.allowWhatsAppVideoConsultation,
             };
           });
         }
@@ -260,7 +333,7 @@ function GetAppointmentPageContent() {
         const res = await axios.get(`${serverUrl}/patient/allDoctors`, {
           headers: {
             Authorization: `Bearer ${token.replace(/"/g, '').trim()}`,
-          }
+          },
         });
         const doc = res.data.find((d: any) => d._id === doctorId);
         if (doc) {
@@ -274,15 +347,15 @@ function GetAppointmentPageContent() {
   }, [doctorId]);
 
   const days = useMemo(() => getNextSevenDays(), []);
-  const fee = bookingType === 'Clinic' ? consultationFee : Math.round(consultationFee * 0.75);
+  const clinicConsultationFee = Number(doctorProfile?.consultationFee ?? consultationFee);
+  const videoConsultationFee = Number(doctorProfile?.videoConsultationFee ?? 0);
+  const fee = bookingType === 'Clinic' ? clinicConsultationFee : videoConsultationFee;
 
   const isDayAvailableForDoctor = (date: Date) => {
     if (!doctorProfile) return true;
     const dayNamesFull = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const currentDayName = dayNamesFull[date.getDay()];
-    const slotsForDay = doctorProfile.availability?.filter(
-      (slot: any) => slot.day === currentDayName && slot.isAvailable
-    ) || [];
+    const slotsForDay = doctorProfile.availability?.filter((slot: any) => slot.day === currentDayName && slot.isAvailable) || [];
     return slotsForDay.length > 0;
   };
 
@@ -290,9 +363,7 @@ function GetAppointmentPageContent() {
     if (!doctorProfile) return [];
     const dayNamesFull = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const currentDayName = dayNamesFull[date.getDay()];
-    const slotsForDay = doctorProfile.availability?.filter(
-      (slot: any) => slot.day === currentDayName && slot.isAvailable
-    ) || [];
+    const slotsForDay = doctorProfile.availability?.filter((slot: any) => slot.day === currentDayName && slot.isAvailable) || [];
     if (slotsForDay.length === 0) {
       return [];
     }
@@ -307,11 +378,17 @@ function GetAppointmentPageContent() {
       const [hours, minutes] = str.split(':').map(Number);
       return hours + minutes / 60;
     };
-    return TIME_SLOTS.filter(slot => {
+    return TIME_SLOTS.filter((slot) => {
       const slotTime = parseTime(slot.time);
       return slotsForDay.some((avail: any) => {
         const start = parseHHMM(avail.startTime);
         const end = parseHHMM(avail.endTime);
+        const now = new Date();
+        const isToday = date.getDate() === now.getDate() && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+        if (isToday) {
+          const slotDateTime = parseSlotToDateTime(date, slot.time);
+          if (slotDateTime <= now) return false;
+        }
         return slotTime >= start && slotTime <= end;
       });
     });
@@ -321,9 +398,9 @@ function GetAppointmentPageContent() {
     return getFilteredTimeSlots(days[selectedDayIdx].date);
   }, [doctorProfile, selectedDayIdx, days]);
 
-  const morning = filteredSlots.filter(s => s.period === 'Morning');
-  const afternoon = filteredSlots.filter(s => s.period === 'Afternoon');
-  const evening = filteredSlots.filter(s => s.period === 'Evening');
+  const morning = filteredSlots.filter((s) => s.period === 'Morning');
+  const afternoon = filteredSlots.filter((s) => s.period === 'Afternoon');
+  const evening = filteredSlots.filter((s) => s.period === 'Evening');
 
   const bookedTimesForSelectedDay = useMemo(() => {
     if (!days[selectedDayIdx]) return [];
@@ -352,23 +429,30 @@ function GetAppointmentPageContent() {
   }, [bookedAppointments, selectedDayIdx, days]);
 
   const cardValid = cardName.trim().length > 2 && cardNumber.length >= 19 && cardExpiry.length === 5 && cardCVV.length === 3;
+  const patientDetailsValid =
+    patientDetails.patientName.trim().length > 1 &&
+    Number(patientDetails.patientAge) > 0 &&
+    /^\d{11}$/.test(patientDetails.patientPhone) &&
+    patientDetails.patientGender.trim().length > 0;
   const walletValid = mobileWalletNumber.replace(/\D/g, '').length >= 10;
   const bankTransferValid = bankReceiptFile !== null;
-  const canPay = paymentMethod === 'cash'
-    || (paymentMethod === 'card' && cardValid)
-    || ((paymentMethod === 'easypaisa' || paymentMethod === 'jazzcash') && walletValid)
-    || (paymentMethod === 'bank_transfer' && bankTransferValid);
+  const canPay =
+    patientDetailsValid &&
+    (paymentMethod === 'cash' ||
+      (paymentMethod === 'card' && cardValid) ||
+      ((paymentMethod === 'easypaisa' || paymentMethod === 'jazzcash') && walletValid) ||
+      (paymentMethod === 'bank_transfer' && bankTransferValid));
 
   const handleConfirm = async () => {
     setIsSubmitting(true);
     setErrorMessage('');
-    
+
     try {
       const token = await getToken();
-      if (!token) { 
-        setErrorMessage('Please log in to book an appointment.'); 
+      if (!token) {
+        setErrorMessage('Please log in to book an appointment.');
         setIsSubmitting(false);
-        return; 
+        return;
       }
 
       const startDateTime = parseSlotToDateTime(days[selectedDayIdx].date, selectedTime!);
@@ -377,16 +461,14 @@ function GetAppointmentPageContent() {
       // Mobile wallet simulation animation
       if (paymentMethod === 'easypaisa' || paymentMethod === 'jazzcash') {
         setWalletStage('sending');
-        await new Promise(r => setTimeout(r, 2000));
+        await new Promise((r) => setTimeout(r, 2000));
         setWalletStage('authorizing');
-        await new Promise(r => setTimeout(r, 2500));
+        await new Promise((r) => setTimeout(r, 2500));
       }
 
       // --- STEP 1: INITIALIZE INTEGRATED GATEWAYS (Stripe, JazzCash, EasyPaisa) ---
       if (paymentMethod === 'card' || paymentMethod === 'easypaisa' || paymentMethod === 'jazzcash') {
-        const endpoint = paymentMethod === 'card' 
-          ? 'create-checkout-session' 
-          : `${paymentMethod}/initiate`;
+        const endpoint = paymentMethod === 'card' ? 'create-checkout-session' : `${paymentMethod}/initiate`;
 
         const initResponse = await axios.post(
           `${serverUrl}/payment/${endpoint}`,
@@ -395,14 +477,16 @@ function GetAppointmentPageContent() {
             startTime: startDateTime.toISOString(),
             endTime: endDateTime.toISOString(),
             appointmentType: bookingType,
-            consultationFee: fee
+            consultationFee: fee,
+            videoConsultationMethod: bookingType === 'Video' ? videoConsultationMethod : undefined,
+            ...patientDetails,
           },
           {
             headers: {
               Authorization: `Bearer ${token.replace(/"/g, '').trim()}`,
             },
-            withCredentials: true
-          }
+            withCredentials: true,
+          },
         );
 
         if (initResponse.data.url) {
@@ -445,46 +529,54 @@ function GetAppointmentPageContent() {
         });
         const bankTransferReceiptUrl = uploadRes.data.url;
 
-        await axios.post(`${serverUrl}/doctor/addPatient`, {
-          doctorId,
-          startTime: startDateTime.toISOString(),
-          endTime: endDateTime.toISOString(),
-          appointmentType: bookingType,
-          paymentMethod: 'bank_transfer',
-          bankTransferReceiptUrl,
-        }, {
-          headers: {
-            Authorization: `Bearer ${token.replace(/"/g, '').trim()}`,
-            'Content-Type': 'application/json',
+        await axios.post(
+          `${serverUrl}/doctor/addPatient`,
+          {
+            doctorId,
+            startTime: startDateTime.toISOString(),
+            endTime: endDateTime.toISOString(),
+            appointmentType: bookingType,
+            paymentMethod: 'bank_transfer',
+            videoConsultationMethod: bookingType === 'Video' ? videoConsultationMethod : undefined,
+            bankTransferReceiptUrl,
+            ...patientDetails,
           },
-          withCredentials: true,
-        });
+          {
+            headers: {
+              Authorization: `Bearer ${token.replace(/"/g, '').trim()}`,
+              'Content-Type': 'application/json',
+            },
+            withCredentials: true,
+          },
+        );
       } else {
         // --- STEP 2: DIRECT BOOKING (Cash On Visit) ---
-        await axios.post(`${serverUrl}/doctor/addPatient`, {
-          doctorId,
-          startTime: startDateTime.toISOString(),
-          endTime: endDateTime.toISOString(),
-          appointmentType: bookingType,
-          paymentMethod,
-          mobileWalletNumber,
-        }, {
-          headers: {
-            Authorization: `Bearer ${token.replace(/"/g, '').trim()}`,
-            'Content-Type': 'application/json',
+        await axios.post(
+          `${serverUrl}/doctor/addPatient`,
+          {
+            doctorId,
+            startTime: startDateTime.toISOString(),
+            endTime: endDateTime.toISOString(),
+            appointmentType: bookingType,
+            paymentMethod,
+            videoConsultationMethod: bookingType === 'Video' ? videoConsultationMethod : undefined,
+            mobileWalletNumber,
+            ...patientDetails,
           },
-          withCredentials: true,
-        });
+          {
+            headers: {
+              Authorization: `Bearer ${token.replace(/"/g, '').trim()}`,
+              'Content-Type': 'application/json',
+            },
+            withCredentials: true,
+          },
+        );
       }
 
       setStep('confirmed');
     } catch (err: any) {
       console.error('Submission error:', err);
-      setErrorMessage(
-        err.response?.data?.error || 
-        err.response?.data?.message || 
-        'Failed to process your request. Please try again.'
-      );
+      setErrorMessage(err.response?.data?.error || err.response?.data?.message || 'Failed to process your request. Please try again.');
     } finally {
       setIsSubmitting(false);
       setWalletStage('idle');
@@ -492,16 +584,21 @@ function GetAppointmentPageContent() {
   };
 
   const handleReset = () => {
-    setStep('datetime'); setSelectedTime(null); setSelectedDayIdx(0);
-    setCardName(''); setCardNumber(''); setCardExpiry(''); setCardCVV('');
+    setStep('datetime');
+    setSelectedTime(null);
+    setSelectedDayIdx(0);
+    setCardName('');
+    setCardNumber('');
+    setCardExpiry('');
+    setCardCVV('');
     setMobileWalletNumber('');
-    setBankReceiptFile(null); setBankReceiptPreview(null);
+    setBankReceiptFile(null);
+    setBankReceiptPreview(null);
     setErrorMessage('');
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-teal-50/30 font-sans text-slate-900 pb-16">
-
       {/* ── Top nav ── */}
       <nav className="bg-white/80 backdrop-blur border-b border-slate-200 px-4 py-3 sticky top-0 z-20">
         <div className="max-w-5xl mx-auto flex items-center gap-3">
@@ -509,7 +606,9 @@ function GetAppointmentPageContent() {
             <ArrowLeft size={20} />
           </Link>
           <div className="flex items-center gap-2 text-sm text-slate-500">
-            <Link href="/patient/findDoctors" className="hover:text-teal-600">Find Doctors</Link>
+            <Link href="/patient/findDoctors" className="hover:text-teal-600">
+              Find Doctors
+            </Link>
             <ChevronRight size={14} />
             <span className="text-slate-800 font-semibold">Book Appointment</span>
           </div>
@@ -517,17 +616,14 @@ function GetAppointmentPageContent() {
       </nav>
 
       <div className="max-w-5xl mx-auto px-4 pt-8 grid grid-cols-1 lg:grid-cols-5 gap-8">
-
         {/* ── LEFT: Doctor summary card (sticky) ── */}
         <aside className="lg:col-span-2">
           <div className="sticky top-20 space-y-4">
-
             {/* Doctor card */}
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
               <div className="flex items-center gap-4 mb-4">
                 <div className="relative">
-                  <img src={doctorImage} alt={doctorName}
-                    className="w-20 h-20 rounded-2xl object-cover border-2 border-slate-100 shadow" />
+                  <img src={doctorImage} alt={doctorName} className="w-20 h-20 rounded-2xl object-cover border-2 border-slate-100 shadow" />
                   <span className="absolute -bottom-1.5 -right-1.5 w-5 h-5 bg-green-500 rounded-full border-2 border-white" />
                 </div>
                 <div>
@@ -548,11 +644,11 @@ function GetAppointmentPageContent() {
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between items-center py-2 border-t border-slate-50">
                   <span className="text-slate-500">In-Clinic Fee</span>
-                  <span className="font-bold text-slate-800">${consultationFee}</span>
+                  <span className="font-bold text-slate-800">PKR {clinicConsultationFee}</span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-t border-slate-50">
                   <span className="text-slate-500">Video Fee</span>
-                  <span className="font-bold text-slate-800">${Math.round(consultationFee * 0.75)}</span>
+                  <span className="font-bold text-slate-800">PKR {videoConsultationFee}</span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-t border-slate-50">
                   <span className="text-slate-500">Duration</span>
@@ -563,18 +659,22 @@ function GetAppointmentPageContent() {
 
             {/* Info pills */}
             <div className="bg-teal-50 border border-teal-100 rounded-2xl p-4 space-y-2 text-sm text-teal-800">
-              <p className="flex items-center gap-2"><CheckCircle2 size={15} className="text-teal-600 shrink-0" /> Free cancellation within 24 hrs</p>
-              <p className="flex items-center gap-2"><CheckCircle2 size={15} className="text-teal-600 shrink-0" /> Instant booking confirmation</p>
-              <p className="flex items-center gap-2"><CheckCircle2 size={15} className="text-teal-600 shrink-0" /> No hidden charges</p>
+              <p className="flex items-center gap-2">
+                <CheckCircle2 size={15} className="text-teal-600 shrink-0" /> Free cancellation within 24 hrs
+              </p>
+              <p className="flex items-center gap-2">
+                <CheckCircle2 size={15} className="text-teal-600 shrink-0" /> Instant booking confirmation
+              </p>
+              <p className="flex items-center gap-2">
+                <CheckCircle2 size={15} className="text-teal-600 shrink-0" /> No hidden charges
+              </p>
             </div>
-
           </div>
         </aside>
 
         {/* ── RIGHT: Booking flow ── */}
         <main className="lg:col-span-3">
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-
             {/* Panel header */}
             <div className={`px-6 py-5 border-b border-slate-100 transition-colors ${step === 'confirmed' ? 'bg-teal-600' : 'bg-white'}`}>
               <h1 className={`text-xl font-extrabold ${step === 'confirmed' ? 'text-white' : 'text-slate-900'}`}>
@@ -583,9 +683,7 @@ function GetAppointmentPageContent() {
                 {step === 'confirmed' && '✅ Appointment Confirmed!'}
               </h1>
               {step !== 'confirmed' && (
-                <p className="text-slate-500 text-sm mt-0.5">
-                  {step === 'datetime' ? 'Pick your preferred slot for the next 7 days' : 'Review and finalize your booking'}
-                </p>
+                <p className="text-slate-500 text-sm mt-0.5">{step === 'datetime' ? 'Pick your preferred slot for the next 7 days' : 'Review and finalize your booking'}</p>
               )}
             </div>
 
@@ -598,7 +696,7 @@ function GetAppointmentPageContent() {
                   {/* Consultation type */}
                   {doctorProfile?.isVideoEnabled !== false && (
                     <div className="flex p-1 bg-slate-100 rounded-xl mb-6">
-                      {(['Clinic', 'Video'] as BookingType[]).map(type => (
+                      {(['Clinic', 'Video'] as BookingType[]).map((type) => (
                         <button
                           key={type}
                           onClick={() => setBookingType(type)}
@@ -608,13 +706,35 @@ function GetAppointmentPageContent() {
                         >
                           {type === 'Clinic' ? <MapPin size={16} /> : <Video size={16} />}
                           <span>{type === 'Clinic' ? 'In-Clinic' : 'Video Call'}</span>
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
-                            bookingType === type ? 'bg-teal-50 text-teal-600' : 'bg-slate-200 text-slate-500'
-                          }`}>
-                            ${type === 'Clinic' ? consultationFee : Math.round(consultationFee * 0.75)}
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${bookingType === type ? 'bg-teal-50 text-teal-600' : 'bg-slate-200 text-slate-500'}`}>
+                            PKR {type === 'Clinic' ? clinicConsultationFee : videoConsultationFee}
                           </span>
                         </button>
                       ))}
+                    </div>
+                  )}
+
+                  {bookingType === 'Video' && (
+                    <div className="mb-6 rounded-2xl border border-teal-100 bg-teal-50/40 p-4">
+                      <p className="mb-3 text-sm font-bold text-slate-800">Choose video consultation method</p>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        {[
+                          { value: 'platform', label: 'Video on this platform', description: 'Receive an incoming call here with camera and microphone.' },
+                          ...(doctorProfile?.allowWhatsAppVideoConsultation === true
+                            ? [{ value: 'whatsapp', label: 'WhatsApp video call', description: 'The doctor will contact your entered 11-digit number.' }]
+                            : []),
+                        ].map((option) => (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => setVideoConsultationMethod(option.value as 'platform' | 'whatsapp')}
+                            className={`rounded-xl border-2 p-4 text-left transition ${videoConsultationMethod === option.value ? 'border-teal-500 bg-white' : 'border-slate-200 bg-white/60'}`}
+                          >
+                            <span className="block text-sm font-bold text-slate-800">{option.label}</span>
+                            <span className="mt-1 block text-xs text-slate-500">{option.description}</span>
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   )}
 
@@ -631,13 +751,16 @@ function GetAppointmentPageContent() {
                           <button
                             key={i}
                             disabled={!isAvailable}
-                            onClick={() => { setSelectedDayIdx(i); setSelectedTime(null); }}
+                            onClick={() => {
+                              setSelectedDayIdx(i);
+                              setSelectedTime(null);
+                            }}
                             className={`flex flex-col items-center py-3 px-2 sm:px-0 min-w-[3.25rem] sm:min-w-0 shrink-0 sm:shrink rounded-xl border-2 transition-all ${
                               selectedDayIdx === i
                                 ? 'bg-teal-600 border-teal-600 text-white shadow-md'
                                 : !isAvailable
-                                ? 'bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed opacity-50'
-                                : 'bg-white border-slate-200 text-slate-600 hover:border-teal-300 hover:bg-teal-50/50'
+                                  ? 'bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed opacity-50'
+                                  : 'bg-white border-slate-200 text-slate-600 hover:border-teal-300 hover:bg-teal-50/50'
                             }`}
                           >
                             <span className="text-[9px] font-bold uppercase opacity-70">{d.label.slice(0, 3)}</span>
@@ -667,7 +790,9 @@ function GetAppointmentPageContent() {
                         <p className="font-bold text-teal-800 text-sm">
                           {days[selectedDayIdx].display} {days[selectedDayIdx].month} · {selectedTime}
                         </p>
-                        <p className="text-teal-600 text-xs">{bookingType} consultation · 30 min · ${fee}</p>
+                        <p className="text-teal-600 text-xs">
+                          {bookingType} consultation · 30 min · PKR {fee}
+                        </p>
                       </div>
                     </div>
                   ) : (
@@ -678,12 +803,13 @@ function GetAppointmentPageContent() {
                   )}
 
                   <button
-                    onClick={() => { setErrorMessage(''); setStep('payment'); }}
+                    onClick={() => {
+                      setErrorMessage('');
+                      setStep('payment');
+                    }}
                     disabled={!selectedTime}
                     className={`w-full py-4 rounded-xl font-bold text-lg transition-all shadow ${
-                      selectedTime
-                        ? 'bg-teal-600 text-white hover:bg-teal-700 hover:shadow-lg'
-                        : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                      selectedTime ? 'bg-teal-600 text-white hover:bg-teal-700 hover:shadow-lg' : 'bg-slate-200 text-slate-400 cursor-not-allowed'
                     }`}
                   >
                     {selectedTime ? 'Proceed to Payment →' : 'Select a Slot to Continue'}
@@ -701,33 +827,73 @@ function GetAppointmentPageContent() {
                       <span className="text-teal-100">Doctor</span>
                       <span className="font-bold text-right">{doctorName}</span>
                       <span className="text-teal-100">Date</span>
-                      <span className="font-bold text-right">{days[selectedDayIdx].display} {days[selectedDayIdx].month} ({days[selectedDayIdx].label})</span>
+                      <span className="font-bold text-right">
+                        {days[selectedDayIdx].display} {days[selectedDayIdx].month} ({days[selectedDayIdx].label})
+                      </span>
                       <span className="text-teal-100">Time</span>
                       <span className="font-bold text-right">{selectedTime}</span>
                       <span className="text-teal-100">Type</span>
                       <span className="font-bold text-right">{bookingType}</span>
                       <span className="text-teal-100 border-t border-teal-500/50 pt-2 mt-1 font-bold text-base">Total</span>
-                      <span className="font-extrabold text-right text-xl border-t border-teal-500/50 pt-2 mt-1">${fee}</span>
+                      <span className="font-extrabold text-right text-xl border-t border-teal-500/50 pt-2 mt-1">PKR {fee}</span>
                     </div>
                   </div>
 
                   {/* Wallet Processing Overlay */}
+                  <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                    <h3 className="mb-4 flex items-center gap-2 text-sm font-bold text-slate-800">
+                      <User size={16} className="text-teal-600" /> Patient Details
+                    </h3>
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      {[
+                        { key: 'patientName', label: 'Full Name', type: 'text' },
+                        { key: 'patientAge', label: 'Age', type: 'number' },
+                        { key: 'patientPhone', label: 'Phone Number', type: 'tel' },
+                      ].map((field) => (
+                        <label key={field.key} className="block">
+                          <span className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500">{field.label}</span>
+                          <input
+                            required
+                            type={field.type}
+                            min={field.type === 'number' ? 1 : undefined}
+                            value={patientDetails[field.key as keyof typeof patientDetails]}
+                            maxLength={field.key === 'patientPhone' ? 11 : undefined}
+                            onChange={(event) => {
+                              const value = field.key === 'patientPhone' ? event.target.value.replace(/\D/g, '').slice(0, 11) : event.target.value;
+                              setPatientDetails((current) => ({ ...current, [field.key]: value }));
+                            }}
+                            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+                          />
+                        </label>
+                      ))}
+                      <label className="block">
+                        <span className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500">Gender</span>
+                        <select
+                          required
+                          value={patientDetails.patientGender}
+                          onChange={(event) => setPatientDetails((current) => ({ ...current, patientGender: event.target.value }))}
+                          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+                        >
+                          <option value="">Select gender</option>
+                          <option value="Male">Male</option>
+                          <option value="Female">Female</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </label>
+                    </div>
+                  </div>
+
                   {walletStage !== 'idle' && (
                     <div className="absolute inset-0 bg-white/95 backdrop-blur-sm z-30 flex flex-col items-center justify-center p-6 text-center animate-fade-in">
                       <div className="relative w-24 h-24 mb-6">
                         <div className="absolute inset-0 rounded-full border-4 border-slate-100 border-t-teal-600 animate-spin"></div>
-                        <div className="absolute inset-2 bg-slate-50 rounded-full flex items-center justify-center text-3xl">
-                          {paymentMethod === 'easypaisa' ? '📱' : '📲'}
-                        </div>
+                        <div className="absolute inset-2 bg-slate-50 rounded-full flex items-center justify-center text-3xl">{paymentMethod === 'easypaisa' ? '📱' : '📲'}</div>
                       </div>
-                      <h3 className="font-extrabold text-xl text-slate-800 mb-2">
-                        {walletStage === 'sending' ? 'Initiating Wallet Transaction' : 'Awaiting Authorization'}
-                      </h3>
+                      <h3 className="font-extrabold text-xl text-slate-800 mb-2">{walletStage === 'sending' ? 'Initiating Wallet Transaction' : 'Awaiting Authorization'}</h3>
                       <p className="text-slate-500 text-sm max-w-xs leading-relaxed">
-                        {walletStage === 'sending' 
+                        {walletStage === 'sending'
                           ? `Sending transaction request to mobile account ${mobileWalletNumber}...`
-                          : `Please check your phone screen. Enter your secret PIN to authorize the transaction of $${fee}.`
-                        }
+                          : `Please check your phone screen. Enter your secret PIN to authorize the transaction of PKR ${fee}.`}
                       </p>
                       <div className="mt-8 flex gap-1.5">
                         <span className="w-2.5 h-2.5 rounded-full bg-teal-600 animate-ping"></span>
@@ -746,15 +912,16 @@ function GetAppointmentPageContent() {
                       { id: 'easypaisa', name: 'EasyPaisa', icon: <span className="text-lg font-extrabold text-emerald-600">EP</span> },
                       { id: 'jazzcash', name: 'JazzCash', icon: <span className="text-lg font-extrabold text-amber-600">JC</span> },
                       { id: 'bank_transfer', name: 'Direct Bank', icon: <Building2 size={20} className="text-blue-600" /> },
-                    ].map(method => (
+                    ].map((method) => (
                       <button
                         key={method.id}
                         type="button"
-                        onClick={() => { setPaymentMethod(method.id as any); setErrorMessage(''); }}
+                        onClick={() => {
+                          setPaymentMethod(method.id as any);
+                          setErrorMessage('');
+                        }}
                         className={`flex flex-col items-center justify-center gap-2 py-3 px-2 rounded-xl border-2 text-xs font-bold transition-all ${
-                          paymentMethod === method.id
-                            ? 'border-teal-500 bg-teal-50 text-teal-700 shadow-sm'
-                            : 'border-slate-200 text-slate-500 hover:border-slate-300'
+                          paymentMethod === method.id ? 'border-teal-500 bg-teal-50 text-teal-700 shadow-sm' : 'border-slate-200 text-slate-500 hover:border-slate-300'
                         }`}
                       >
                         {method.icon}
@@ -770,7 +937,7 @@ function GetAppointmentPageContent() {
                         <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Cardholder Name</label>
                         <input
                           value={cardName}
-                          onChange={e => setCardName(e.target.value)}
+                          onChange={(e) => setCardName(e.target.value)}
                           placeholder="John Smith"
                           className="w-full px-4 py-3 border border-slate-200 bg-white rounded-xl text-sm focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-50 transition-all"
                         />
@@ -779,7 +946,7 @@ function GetAppointmentPageContent() {
                         <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Card Number</label>
                         <input
                           value={cardNumber}
-                          onChange={e => setCardNumber(formatCard(e.target.value))}
+                          onChange={(e) => setCardNumber(formatCard(e.target.value))}
                           placeholder="1234 5678 9012 3456"
                           className="w-full px-4 py-3 border border-slate-200 bg-white rounded-xl text-sm font-mono tracking-widest focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-50 transition-all"
                         />
@@ -789,7 +956,7 @@ function GetAppointmentPageContent() {
                           <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Expiry</label>
                           <input
                             value={cardExpiry}
-                            onChange={e => setCardExpiry(formatExpiry(e.target.value))}
+                            onChange={(e) => setCardExpiry(formatExpiry(e.target.value))}
                             placeholder="MM/YY"
                             className="w-full px-4 py-3 border border-slate-200 bg-white rounded-xl text-sm font-mono focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-50 transition-all"
                           />
@@ -798,7 +965,7 @@ function GetAppointmentPageContent() {
                           <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">CVV</label>
                           <input
                             value={cardCVV}
-                            onChange={e => setCardCVV(e.target.value.replace(/\D/g, '').slice(0, 3))}
+                            onChange={(e) => setCardCVV(e.target.value.replace(/\D/g, '').slice(0, 3))}
                             placeholder="•••"
                             type="password"
                             className="w-full px-4 py-3 border border-slate-200 bg-white rounded-xl text-sm font-mono focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-50 transition-all"
@@ -810,33 +977,35 @@ function GetAppointmentPageContent() {
 
                   {/* Wallet form */}
                   {(paymentMethod === 'easypaisa' || paymentMethod === 'jazzcash') && (
-                    <div className={`space-y-4 mb-5 p-5 rounded-2xl border transition-all ${
-                      paymentMethod === 'easypaisa' ? 'bg-emerald-50/50 border-emerald-200' : 'bg-amber-50/50 border-amber-200'
-                    }`}>
+                    <div
+                      className={`space-y-4 mb-5 p-5 rounded-2xl border transition-all ${
+                        paymentMethod === 'easypaisa' ? 'bg-emerald-50/50 border-emerald-200' : 'bg-amber-50/50 border-amber-200'
+                      }`}
+                    >
                       <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white shrink-0 shadow-sm ${
-                          paymentMethod === 'easypaisa' ? 'bg-emerald-500' : 'bg-amber-500'
-                        }`}>
+                        <div
+                          className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white shrink-0 shadow-sm ${
+                            paymentMethod === 'easypaisa' ? 'bg-emerald-500' : 'bg-amber-500'
+                          }`}
+                        >
                           {paymentMethod === 'easypaisa' ? 'EP' : 'JC'}
                         </div>
                         <div>
-                          <h4 className="font-bold text-slate-800 text-sm">
-                            {paymentMethod === 'easypaisa' ? 'EasyPaisa Account' : 'JazzCash Account'}
-                          </h4>
+                          <h4 className="font-bold text-slate-800 text-sm">{paymentMethod === 'easypaisa' ? 'EasyPaisa Account' : 'JazzCash Account'}</h4>
                           <p className="text-xs text-slate-400">Pay directly from your mobile wallet account</p>
                         </div>
                       </div>
-                      
+
                       <div>
                         <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Mobile Account Number</label>
                         <input
                           value={mobileWalletNumber}
-                          onChange={e => setMobileWalletNumber(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                          onChange={(e) => setMobileWalletNumber(e.target.value.replace(/\D/g, '').slice(0, 11))}
                           placeholder="e.g. 03001234567"
                           className="w-full px-4 py-3 border border-slate-200 bg-white rounded-xl text-sm font-mono tracking-widest focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-50 transition-all"
                         />
                         <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">
-                          * Please ensure your phone is unlocked. You will receive a direct prompt on your mobile to enter your PIN and approve the payment of ${fee}.
+                          * Please ensure your phone is unlocked. You will receive a direct prompt on your mobile to enter your PIN and approve the payment of PKR {fee}.
                         </p>
                       </div>
                     </div>
@@ -846,7 +1015,9 @@ function GetAppointmentPageContent() {
                   {paymentMethod === 'cash' && (
                     <div className="mb-5 p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-800">
                       <p className="font-bold text-sm mb-1">Pay at the Clinic</p>
-                      <p className="text-xs">Please bring <strong>${fee}</strong> in cash and arrive 10 minutes before your appointment time.</p>
+                      <p className="text-xs">
+                        Please bring <strong>PKR {fee}</strong> in cash and arrive 10 minutes before your appointment time.
+                      </p>
                     </div>
                   )}
 
@@ -887,7 +1058,7 @@ function GetAppointmentPageContent() {
                           )}
                           <div className="flex justify-between text-sm border-t border-blue-50 pt-2 mt-2">
                             <span className="text-slate-500 font-bold">Amount to Transfer</span>
-                            <span className="font-extrabold text-blue-700">${fee}</span>
+                            <span className="font-extrabold text-blue-700">PKR {fee}</span>
                           </div>
                         </div>
                       ) : (
@@ -913,7 +1084,7 @@ function GetAppointmentPageContent() {
                             type="file"
                             accept="image/*"
                             className="hidden"
-                            onChange={e => {
+                            onChange={(e) => {
                               const file = e.target.files?.[0] || null;
                               setBankReceiptFile(file);
                               if (file) setBankReceiptPreview(URL.createObjectURL(file));
@@ -926,7 +1097,9 @@ function GetAppointmentPageContent() {
                             <FileImage size={12} /> {bankReceiptFile.name}
                           </p>
                         )}
-                        <p className="text-xs text-slate-400 mt-1.5">Transfer the exact amount to the above account, take a screenshot of the successful transfer, and upload it here.</p>
+                        <p className="text-xs text-slate-400 mt-1.5">
+                          Transfer the exact amount to the above account, take a screenshot of the successful transfer, and upload it here.
+                        </p>
                       </div>
                     </div>
                   )}
@@ -944,9 +1117,13 @@ function GetAppointmentPageContent() {
                     disabled={isSubmitting || !canPay}
                     className="w-full py-4 rounded-xl font-bold text-white bg-teal-600 hover:bg-teal-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-all shadow flex items-center justify-center gap-2 text-base"
                   >
-                    {isSubmitting
-                      ? <><Loader2 size={20} className="animate-spin" /> Processing…</>
-                      : `Confirm & Pay $${fee}`}
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 size={20} className="animate-spin" /> Processing…
+                      </>
+                    ) : (
+                      `Confirm & Pay PKR ${fee}`
+                    )}
                   </button>
 
                   <button
@@ -980,11 +1157,13 @@ function GetAppointmentPageContent() {
                       { icon: <Clock size={16} className="text-teal-600" />, label: 'Time', value: selectedTime! },
                       {
                         icon: bookingType === 'Clinic' ? <MapPin size={16} className="text-teal-600" /> : <Video size={16} className="text-teal-600" />,
-                        label: 'Type', value: bookingType === 'Clinic' ? 'In-Clinic Visit' : 'Video Consultation'
+                        label: 'Type',
+                        value: bookingType === 'Clinic' ? 'In-Clinic Visit' : 'Video Consultation',
                       },
                       {
                         icon: <CreditCard size={16} className="text-teal-600" />,
-                        label: 'Payment', value: `$${fee} · ${paymentMethod === 'card' ? 'Card' : 'Pay at Clinic'}`
+                        label: 'Payment',
+                        value: `PKR ${fee} · ${paymentMethod === 'card' ? 'Card' : 'Pay at Clinic'}`,
                       },
                     ].map(({ icon, label, value }) => (
                       <div key={label} className="flex items-center gap-3 text-sm">
@@ -1021,11 +1200,13 @@ function GetAppointmentPageContent() {
 
 export default function GetAppointmentPage() {
   return (
-    <React.Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <Loader2 className="w-8 h-8 text-teal-600 animate-spin" />
-      </div>
-    }>
+    <React.Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-slate-50">
+          <Loader2 className="w-8 h-8 text-teal-600 animate-spin" />
+        </div>
+      }
+    >
       <GetAppointmentPageContent />
     </React.Suspense>
   );

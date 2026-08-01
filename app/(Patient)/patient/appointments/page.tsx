@@ -18,6 +18,8 @@ import {
 import DashboardShell from '@/components/layouts/DashboardShell';
 import { getToken } from '@/app/actions/token';
 import Image from 'next/image';
+import Link from 'next/link';
+import VideoConsultationRoom from '@/components/video/VideoConsultationRoom';
 
 // --- Types ---
 type AppointmentStatus = 'Confirmed' | 'Pending' | 'Completed' | 'Cancelled' | 'checked-in' | 'in-progress' | 'Upcoming';
@@ -32,6 +34,9 @@ interface Appointment {
   time: string;
   type: AppointmentType;
   status: AppointmentStatus;
+  videoConsultationMethod?: 'platform' | 'whatsapp';
+  videoCallStatus?: string;
+  videoRecordingUrl?: string;
   location?: string; // Optional for In-Clinic
 }
 
@@ -45,6 +50,9 @@ interface AppointmentApiResponse {
   time: string;
   type?: string;
   status?: AppointmentStatus;
+  videoConsultationMethod?: 'platform' | 'whatsapp';
+  videoCallStatus?: string;
+  videoRecordingUrl?: string;
   location?: string;
 }
 
@@ -124,9 +132,12 @@ export default function MyAppointments() {
           avatar: item.avatar,
           date: new Date(item.date).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }),
           time: new Date(item.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          type: item.type?.toLowerCase() === 'online' ? 'Video' : 'In-Clinic',
+          type: ['online', 'video'].includes(item.type?.toLowerCase() || '') ? 'Video' : 'In-Clinic',
           status: item.status || 'Pending',
           location: item.location || 'Clinic Cabin',
+          videoConsultationMethod: item.videoConsultationMethod,
+          videoCallStatus: item.videoCallStatus,
+          videoRecordingUrl: item.videoRecordingUrl,
         }));
         setAppointments(mapped);
       }
@@ -360,9 +371,15 @@ export default function MyAppointments() {
                       <div className="flex items-center gap-2">
                         {['confirmed', 'pending', 'checked-in', 'in-progress', 'upcoming'].includes(apt.status.toLowerCase()) ? (
                           <>
-                            <button className="px-4 py-2 bg-gradient-to-r from-[#16BCC8] to-[#0ea5a9] text-white text-sm font-semibold rounded-xl transition-all duration-300 shadow-sm hover:shadow-[0_2px_12px_rgba(22,188,200,0.3)]">
-                              {apt.type === 'Video' ? 'Join Call' : 'View Details'}
-                            </button>
+                            {apt.type === 'Video' && apt.videoConsultationMethod !== 'whatsapp' && (
+                              <VideoConsultationRoom appointmentId={apt.id} role="patient" otherPartyName={apt.doctorName} consultationMethod={apt.videoConsultationMethod} compact />
+                            )}
+                            <Link
+                              href={`/patient/appointments/${apt.id}`}
+                              className="px-4 py-2 bg-gradient-to-r from-[#16BCC8] to-[#0ea5a9] text-white text-sm font-semibold rounded-xl transition-all duration-300 shadow-sm hover:shadow-[0_2px_12px_rgba(22,188,200,0.3)]"
+                            >
+                              View Details
+                            </Link>
                             <button className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all duration-200" title="Cancel Appointment">
                               <X size={18} />
                             </button>
