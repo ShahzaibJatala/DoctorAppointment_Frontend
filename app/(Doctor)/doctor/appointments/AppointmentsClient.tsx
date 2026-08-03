@@ -2,14 +2,32 @@
 
 import React, { useEffect, useState } from 'react';
 import {
-  Calendar, Search, Clock, MapPin, Video,
-  CheckCircle, XCircle, LayoutDashboard, Users, Star, Settings,
-  Menu, FileText, X, Loader2, Pill, UploadCloud, Download
+  Calendar,
+  Search,
+  Clock,
+  MapPin,
+  Video,
+  CheckCircle,
+  XCircle,
+  LayoutDashboard,
+  Users,
+  Star,
+  Settings,
+  Menu,
+  FileText,
+  X,
+  Loader2,
+  Pill,
+  UploadCloud,
+  Download,
+  PlayCircle,
+  Phone,
+  CreditCard,
 } from 'lucide-react';
-import axios from "axios";
-import { getToken } from "@/app/actions/token";
-import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
-import { setAppointmentStatus as setReduxStatus, AppointmentStatus as ReduxStatus } from "@/lib/redux/features/appointment/appointmentSlice";
+import axios from 'axios';
+import { getToken } from '@/app/actions/token';
+import { useAppDispatch, useAppSelector } from '@/lib/redux/hooks';
+import { setAppointmentStatus as setReduxStatus, AppointmentStatus as ReduxStatus } from '@/lib/redux/features/appointment/appointmentSlice';
 import DashboardShell from '@/components/layouts/DashboardShell';
 import { downloadPdf } from '@/lib/downloadPdf';
 
@@ -41,6 +59,7 @@ interface Appointment {
   videoConsultationMethod?: 'platform' | 'whatsapp';
   videoCallStatus?: string;
   videoRecordingUrl?: string;
+  tokenNumber?: number;
 }
 
 // --- Props ---
@@ -54,13 +73,9 @@ const StatusBadge = ({ status }: { status: AppointmentStatus }) => {
     Upcoming: 'bg-blue-50 text-blue-700 border-blue-200',
     Completed: 'bg-green-50 text-green-700 border-green-200',
     Cancelled: 'bg-red-50 text-red-700 border-red-200',
-    'No-Show': 'bg-slate-100 text-slate-600 border-slate-200'
+    'No-Show': 'bg-slate-100 text-slate-600 border-slate-200',
   };
-  return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${styles[status]}`}>
-      {status}
-    </span>
-  );
+  return <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${styles[status]}`}>{status}</span>;
 };
 
 const EmptyState = () => (
@@ -69,9 +84,7 @@ const EmptyState = () => (
       <Calendar className="w-8 h-8 text-slate-300" />
     </div>
     <h3 className="text-lg font-bold text-slate-800">No appointments found</h3>
-    <p className="text-slate-500 text-sm max-w-xs mt-1">
-      Try adjusting your filters or select a different date range.
-    </p>
+    <p className="text-slate-500 text-sm max-w-xs mt-1">Try adjusting your filters or select a different date range.</p>
   </div>
 );
 
@@ -128,6 +141,17 @@ export default function AppointmentsClient({ specialization }: AppointmentsClien
   const [isUploading, setIsUploading] = useState(false);
 
   const [showRecording, setShowRecording] = useState(false);
+  const [recordingToPlay, setRecordingToPlay] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleRecordingSaved = (event: Event) => {
+      const detail = (event as CustomEvent<{ appointmentId: string; url: string }>).detail;
+      if (!detail?.appointmentId || !detail.url) return;
+      setAppointments((current) => current.map((appointment) => (appointment.id === detail.appointmentId ? { ...appointment, videoRecordingUrl: detail.url } : appointment)));
+    };
+    window.addEventListener('medibook:recording-saved', handleRecordingSaved);
+    return () => window.removeEventListener('medibook:recording-saved', handleRecordingSaved);
+  }, []);
   const dispatch = useAppDispatch();
   const reduxStatus = useAppSelector((state) => state.appointment.status);
 
@@ -137,7 +161,7 @@ export default function AppointmentsClient({ specialization }: AppointmentsClien
       const token = await getToken();
 
       if (!token) {
-        console.error("No token found, skipping fetch.");
+        console.error('No token found, skipping fetch.');
         setIsLoading(false);
         return;
       }
@@ -146,7 +170,7 @@ export default function AppointmentsClient({ specialization }: AppointmentsClien
 
       const response = await axios.get(`${process.env.NEXT_PUBLIC_SERVER_URL}/doctor/getPatients`, {
         headers: {
-          'Authorization': `Bearer ${cleanToken}`,
+          Authorization: `Bearer ${cleanToken}`,
           'Content-Type': 'application/json',
         },
         withCredentials: true,
@@ -156,14 +180,14 @@ export default function AppointmentsClient({ specialization }: AppointmentsClien
 
       const mappedData: Appointment[] = response.data.map((patient: any) => {
         const statusLower = patient.status?.toLowerCase();
-        const normalizedStatus: AppointmentStatus = 
+        const normalizedStatus: AppointmentStatus =
           statusLower === 'confirmed' || statusLower === 'upcoming' || statusLower === 'pending' || statusLower === 'checked-in' || statusLower === 'in-progress'
-            ? 'Upcoming' 
+            ? 'Upcoming'
             : statusLower === 'completed'
-            ? 'Completed'
-            : statusLower === 'cancelled'
-            ? 'Cancelled'
-            : 'Upcoming';
+              ? 'Completed'
+              : statusLower === 'cancelled'
+                ? 'Cancelled'
+                : 'Upcoming';
 
         return {
           id: patient.appointmentId || patient._id,
@@ -187,19 +211,15 @@ export default function AppointmentsClient({ specialization }: AppointmentsClien
           videoConsultationMethod: patient.videoConsultationMethod,
           videoCallStatus: patient.videoCallStatus,
           videoRecordingUrl: patient.videoRecordingUrl,
+          tokenNumber: patient.tokenNumber,
         };
       });
 
       // Merge any locally saved status/prescription overrides on top of backend data
       const overrides = getOverrides();
-      const mergedData = mappedData.map((apt) =>
-        overrides[apt.id]
-          ? { ...apt, ...overrides[apt.id] }
-          : apt
-      );
+      const mergedData = mappedData.map((apt) => (overrides[apt.id] ? { ...apt, ...overrides[apt.id] } : apt));
 
       setAppointments(mergedData);
-
     } catch (error) {
       console.error('Error fetching appointments:', error);
     } finally {
@@ -214,7 +234,7 @@ export default function AppointmentsClient({ specialization }: AppointmentsClien
   const handleUploadReport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    const invalidFile = Array.from(files).find(file => file.type !== 'application/pdf' || !file.name.toLowerCase().endsWith('.pdf'));
+    const invalidFile = Array.from(files).find((file) => file.type !== 'application/pdf' || !file.name.toLowerCase().endsWith('.pdf'));
     if (invalidFile) {
       alert('Only PDF report files are allowed.');
       e.target.value = '';
@@ -224,25 +244,21 @@ export default function AppointmentsClient({ specialization }: AppointmentsClien
 
     try {
       const token = await getToken();
-      if (!token) throw new Error("No token found");
+      if (!token) throw new Error('No token found');
       const cleanToken = token.replace(/"/g, '').trim();
 
       for (let i = 0; i < files.length; i++) {
         const formData = new FormData();
         formData.append('file', files[i]);
 
-        const res = await axios.post(
-          `${process.env.NEXT_PUBLIC_SERVER_URL}/patient/upload-report-file`,
-          formData,
-          {
-            headers: {
-              'Authorization': `Bearer ${cleanToken}`,
-              'Content-Type': 'multipart/form-data',
-            }
-          }
-        );
+        const res = await axios.post(`${process.env.NEXT_PUBLIC_SERVER_URL}/patient/upload-report-file`, formData, {
+          headers: {
+            Authorization: `Bearer ${cleanToken}`,
+            'Content-Type': 'multipart/form-data',
+          },
+        });
         if (res.data?.url) {
-          setUploadedReports(prev => [...prev, res.data.url]);
+          setUploadedReports((prev) => [...prev, res.data.url]);
         }
       }
       alert('Report files uploaded and attached successfully!');
@@ -258,9 +274,9 @@ export default function AppointmentsClient({ specialization }: AppointmentsClien
   useEffect(() => {
     if (selectedAppointment) {
       // Find latest mapped record details in state to display up-to-date data
-      const currentApt = appointments.find(a => a.id === selectedAppointment.id) || selectedAppointment;
+      const currentApt = appointments.find((a) => a.id === selectedAppointment.id) || selectedAppointment;
       setPrescriptionText(currentApt.prescription || '');
-      setReasonText(currentApt.reason || '');   // ← sync reason
+      setReasonText(currentApt.reason || ''); // ← sync reason
       dispatch(setReduxStatus(currentApt.status));
       setUploadedReports([]);
     }
@@ -270,7 +286,7 @@ export default function AppointmentsClient({ specialization }: AppointmentsClien
   const handleUpdateStatus = async (id: string, newStatus: AppointmentStatus) => {
     try {
       const token = await getToken();
-      if (!token) throw new Error("No token found");
+      if (!token) throw new Error('No token found');
       const cleanToken = token.replace(/"/g, '').trim();
 
       const dbStatus = newStatus === 'Upcoming' ? 'confirmed' : newStatus.toLowerCase();
@@ -279,16 +295,16 @@ export default function AppointmentsClient({ specialization }: AppointmentsClien
         { status: dbStatus },
         {
           headers: {
-            'Authorization': `Bearer ${cleanToken}`,
-            'Content-Type': 'application/json'
-          }
-        }
+            Authorization: `Bearer ${cleanToken}`,
+            'Content-Type': 'application/json',
+          },
+        },
       );
 
       saveOverride(id, { status: newStatus });
       await fetchAppointments();
       if (selectedAppointment) {
-        setSelectedAppointment(prev => prev ? { ...prev, status: newStatus } : null);
+        setSelectedAppointment((prev) => (prev ? { ...prev, status: newStatus } : null));
         dispatch(setReduxStatus(newStatus));
       }
     } catch (err) {
@@ -302,15 +318,15 @@ export default function AppointmentsClient({ specialization }: AppointmentsClien
 
     try {
       const token = await getToken();
-      if (!token) throw new Error("No authentication token found");
+      if (!token) throw new Error('No authentication token found');
       const cleanToken = token.replace(/"/g, '').trim();
 
       const payload = {
         appointmentDate: new Date().toISOString(),
         prescription: prescriptionText,
-        reasonForVisit: reasonText,          // ← use the editable reason state
+        reasonForVisit: reasonText, // ← use the editable reason state
         appointmentStatus: selectedAppointment.status,
-        reports: uploadedReports
+        reports: uploadedReports,
       };
 
       const response = await axios.put(
@@ -318,27 +334,26 @@ export default function AppointmentsClient({ specialization }: AppointmentsClien
         { ...payload, appointmentStatus: reduxStatus },
         {
           headers: {
-            'Authorization': `Bearer ${cleanToken}`,
-            'Content-Type': 'application/json'
+            Authorization: `Bearer ${cleanToken}`,
+            'Content-Type': 'application/json',
           },
-          withCredentials: true
-        }
+          withCredentials: true,
+        },
       );
 
       saveOverride(selectedAppointment.id, { prescription: prescriptionText });
-      console.log("Prescription saved successfully!", response.data);
-      
+      console.log('Prescription saved successfully!', response.data);
+
       await fetchAppointments();
       setSelectedAppointment(null);
-
     } catch (error: any) {
-      console.log("Detailed Error:", error.response?.data);
-      console.error("Failed to save prescription", error);
-      alert("Failed to save the prescription. Please try again.");
+      console.log('Detailed Error:', error.response?.data);
+      console.error('Failed to save prescription', error);
+      alert('Failed to save the prescription. Please try again.');
     }
   };
 
-  const filteredAppointments = appointments.filter(apt => {
+  const filteredAppointments = appointments.filter((apt) => {
     const appointmentDate = new Date(apt.startTime);
     const today = new Date();
     const isToday = appointmentDate.toDateString() === today.toDateString();
@@ -353,417 +368,487 @@ export default function AppointmentsClient({ specialization }: AppointmentsClien
 
   return (
     <DashboardShell role="doctor" activeHref="/doctor/appointments" showHealthTip={false}>
-        <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-lg border-b border-slate-200 px-4 sm:px-6 py-4">
-          <h1 className="text-lg sm:text-xl font-bold text-slate-800">Appointments Manager</h1>
-          <p className="text-xs text-teal-600 font-medium mt-0.5 flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-teal-500 inline-block" />
-            {specialization}
-          </p>
-        </header>
-
-        <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
-
-          {/* Controls */}
-          <div className="flex flex-col md:flex-row justify-between gap-4">
-            <div className="flex overflow-x-auto bg-slate-100 p-1 rounded-lg self-start scrollbar-hide w-full md:w-auto">
-              {(['All', 'Today', 'Upcoming', 'Completed', 'Cancelled'] as const).map(tab => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-4 py-2 text-sm font-medium rounded-md transition-all whitespace-nowrap ${
-                    activeTab === tab ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                  }`}
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
-            <div className="relative w-full md:w-72">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-              <input
-                type="text"
-                placeholder="Search patient name..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-50 transition-all"
-              />
-            </div>
+      <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-lg border-b border-slate-200 px-4 sm:px-6 py-4">
+        <h1 className="text-lg sm:text-xl font-bold text-slate-800">Appointments Manager</h1>
+        <p className="text-xs text-teal-600 font-medium mt-0.5 flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-teal-500 inline-block" />
+          {specialization}
+        </p>
+      </header>
+      <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
+        {/* Controls */}
+        <div className="flex flex-col md:flex-row justify-between gap-4">
+          <div className="flex overflow-x-auto bg-slate-100 p-1 rounded-lg self-start scrollbar-hide w-full md:w-auto">
+            {(['All', 'Today', 'Upcoming', 'Completed', 'Cancelled'] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-all whitespace-nowrap ${
+                  activeTab === tab ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
           </div>
-
-          <div className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden min-h-[400px]">
-            {isLoading ? (
-              <div className="flex flex-col items-center justify-center h-[400px]">
-                <Loader2 className="w-8 h-8 text-teal-600 animate-spin mb-4" />
-                <p className="text-slate-500 font-medium">Loading appointments...</p>
-              </div>
-            ) : filteredAppointments.length === 0 ? (
-              <EmptyState />
-            ) : (
-              <>
-                {/* --- MOBILE VIEW (CARDS) --- */}
-                <div className="md:hidden divide-y divide-slate-100">
-                  {paginatedAppointments.map((apt) => (
-                    <div key={apt.id} className="p-4 space-y-4">
-                      <div className="flex justify-between items-start">
-                        <div className="flex items-center gap-3">
-                          <img src={apt.avatar} alt="" className="w-12 h-12 rounded-full object-cover border border-slate-100 bg-slate-100" />
-                          <div>
-                            <p className="font-bold text-slate-800">{apt.patientName}</p>
-                            <p className="text-xs text-slate-500">{apt.age}y, {apt.gender}</p>
-                          </div>
-                        </div>
-                        <StatusBadge status={apt.status} />
-                      </div>
-
-                      <div className="bg-slate-50 p-3 rounded-lg flex flex-col gap-2 text-sm">
-                        <div className="flex items-center gap-2 text-slate-600">
-                          <Calendar size={14} className="text-teal-500"/> {apt.date}
-                        </div>
-                        <div className="flex items-center gap-2 text-slate-600">
-                          <Clock size={14} className="text-teal-500"/> {apt.time}
-                        </div>
-                        <div className="flex items-center gap-2 text-teal-600 font-medium">
-                          <span className="text-xs">{apt.reason}</span>
-                        </div>
-                      </div>
-
-                      <button
-                        onClick={() => setSelectedAppointment(apt)}
-                        className="w-full py-2 bg-teal-50 text-teal-700 font-medium rounded-lg text-sm"
-                      >
-                        Manage Appointment
-                      </button>
-                    </div>
-                  ))}
-                </div>
-
-                {/* --- DESKTOP VIEW (TABLE) --- */}
-                <div className="hidden md:block overflow-x-auto">
-                  <table className="w-full text-left">
-                    <thead className="bg-slate-50 border-b border-slate-100">
-                      <tr>
-                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Patient</th>
-                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Date & Time</th>
-                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Type</th>
-                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Reason</th>
-                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
-                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {paginatedAppointments.map((apt) => (
-                        <tr key={apt.id} className="hover:bg-slate-50/50 transition-colors group">
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-3">
-                              <img src={apt.avatar} alt="" className="w-10 h-10 rounded-full object-cover border border-slate-100 bg-slate-100" />
-                              <div>
-                                <p className="font-bold text-slate-800 text-sm">{apt.patientName}</p>
-                                <p className="text-xs text-slate-500">{apt.age}y, {apt.gender}</p>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex flex-col">
-                              <span className="text-sm font-medium text-slate-700">{apt.date}</span>
-                              <span className="text-xs text-slate-500">{apt.time}</span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-2 text-sm text-slate-600">
-                              {apt.type === 'Video' ? <Video size={16} className="text-blue-500" /> : <MapPin size={16} className="text-teal-500" />}
-                              {apt.type}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className="text-sm text-slate-700 font-medium">{apt.reason}</span>
-                          </td>
-                          <td className="px-6 py-4">
-                            <StatusBadge status={apt.status} />
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            <button
-                              onClick={() => setSelectedAppointment(apt)}
-                              className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
-                            >
-                              <FileText size={18} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Pagination Footer */}
-                {totalPages > 1 && (
-                  <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/80 flex items-center justify-between">
-                     <span className="text-xs text-slate-500 font-medium">
-                       Showing {((currentPage - 1) * PAGE_SIZE) + 1} to {Math.min(currentPage * PAGE_SIZE, filteredAppointments.length)} of {filteredAppointments.length} appointments
-                     </span>
-                     <div className="flex gap-2">
-                       <button
-                         onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                         disabled={currentPage === 1}
-                         className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50 cursor-pointer"
-                       >
-                         Previous
-                       </button>
-                       <span className="text-xs font-semibold text-slate-600 flex items-center px-1">
-                         Page {currentPage} of {totalPages}
-                       </span>
-                       <button
-                         onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                         disabled={currentPage === totalPages}
-                         className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50 cursor-pointer"
-                       >
-                         Next
-                       </button>
-                     </div>
-                  </div>
-                )}
-              </>
-            )}
+          <div className="relative w-full md:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+            <input
+              type="text"
+              placeholder="Search patient name..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-50 transition-all"
+            />
           </div>
         </div>
 
-      {/* --- MODAL --- */}
-      {selectedAppointment && (() => {
-        // Resolve latest data from state
-        const currentApt = appointments.find(a => a.id === selectedAppointment.id) || selectedAppointment;
-        return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden animate-fade-up relative">
+        <div className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden min-h-[400px]">
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center h-[400px]">
+              <Loader2 className="w-8 h-8 text-teal-600 animate-spin mb-4" />
+              <p className="text-slate-500 font-medium">Loading appointments...</p>
+            </div>
+          ) : filteredAppointments.length === 0 ? (
+            <EmptyState />
+          ) : (
+            <>
+              {/* --- MOBILE VIEW (CARDS) --- */}
+              <div className="md:hidden divide-y divide-slate-100">
+                {paginatedAppointments.map((apt) => (
+                  <article key={apt.id} className="min-w-0 space-y-4 overflow-hidden p-4 sm:p-5">
+                    <div className="flex min-w-0 items-start gap-3">
+                      <img src={apt.avatar} alt={apt.patientName} className="h-12 w-12 shrink-0 rounded-xl border border-slate-100 bg-slate-100 object-cover sm:h-14 sm:w-14" />
+                      <div className="min-w-0 flex-1">
+                        <p className="break-words font-bold text-slate-800">{apt.patientName}</p>
+                        <p className="mt-0.5 break-words text-xs text-slate-500">
+                          {apt.age} years � {apt.gender || 'Not provided'}
+                        </p>
+                        <div className="mt-2">
+                          <StatusBadge status={apt.status} />
+                        </div>
+                      </div>
+                    </div>
 
-              {/* Modal Header */}
-              <div className="p-6 border-b border-slate-100 flex items-start justify-between bg-slate-50/50">
-                <div className="flex items-center gap-4">
-                  <img src={currentApt.avatar} alt="" className="w-16 h-16 rounded-full object-cover border-2 border-white shadow-sm" />
-                  <div>
-                    <h2 className="text-xl font-bold text-slate-800">{currentApt.patientName}</h2>
-                    <p className="text-sm text-slate-500">{currentApt.age}y • {currentApt.gender} • {currentApt.phone}</p>
-                    <span className="inline-flex items-center gap-1 mt-1 text-xs font-semibold text-teal-700 bg-teal-50 border border-teal-100 px-2 py-0.5 rounded-full">
-                      {currentApt.reason}
-                    </span>
-                  </div>
-                </div>
-                <button onClick={() => setSelectedAppointment(null)} className="p-2 bg-white rounded-full text-slate-400 hover:text-slate-600 shadow-sm border border-slate-100">
-                  <X size={20} />
-                </button>
-              </div>
-
-              {/* Modal Body */}
-              <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
-
-                {/* Info Grid — Time | Status | Reason */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
-                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Time</p>
-                    <p className="font-medium text-slate-800">{currentApt.date}</p>
-                    <p className="text-sm text-slate-500">{currentApt.time}</p>
-                  </div>
-
-                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
-                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Status</p>
-                    <div className="mt-1"><StatusBadge status={currentApt.status} /></div>
-                  </div>
-
-                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
-                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Reason for Visit</p>
-                    <input
-                      value={reasonText}
-                      onChange={(e) => setReasonText(e.target.value)}
-                      placeholder="e.g. Cardiology"
-                      className="w-full mt-1 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm text-slate-800 font-medium focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-50 transition-all"
-                    />
-                  </div>
-                </div>
-
-                {/* Bank Transfer Receipt */}
-                {currentApt.type === 'Video' && (
-                  <div className="rounded-xl border border-teal-100 bg-teal-50/40 p-4">
-                    <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Patient's selected video method</p>
-                    <p className="mt-1 font-bold text-slate-800">{currentApt.videoConsultationMethod === 'whatsapp' ? 'WhatsApp Video Call' : 'Video on this platform'}</p>
-                    <div className="mt-3 flex flex-wrap items-center gap-3">
-                      {currentApt.videoConsultationMethod === 'whatsapp' ? (
-                        <a href={`https://wa.me/92${String(currentApt.phone || '').replace(/\D/g, '').replace(/^0/, '')}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white">
-                          Contact on WhatsApp
-                        </a>
-                      ) : (
-                        <VideoConsultationRoom appointmentId={currentApt.id} role="doctor" otherPartyName={currentApt.patientName} consultationMethod={currentApt.videoConsultationMethod} />
+                    <dl className="grid min-w-0 grid-cols-1 gap-3 rounded-xl bg-slate-50 p-3 text-sm sm:grid-cols-2">
+                      <div className="min-w-0">
+                        <dt className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Date</dt>
+                        <dd className="mt-1 flex min-w-0 items-start gap-2 break-words text-slate-700">
+                          <Calendar size={14} className="mt-0.5 shrink-0 text-teal-500" /> {apt.date}
+                        </dd>
+                      </div>
+                      <div className="min-w-0">
+                        <dt className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Time</dt>
+                        <dd className="mt-1 flex min-w-0 items-start gap-2 break-words text-slate-700">
+                          <Clock size={14} className="mt-0.5 shrink-0 text-teal-500" /> {apt.time}
+                        </dd>
+                      </div>
+                      <div className="min-w-0">
+                        <dt className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Appointment Type</dt>
+                        <dd className="mt-1 flex min-w-0 items-start gap-2 break-words text-slate-700">
+                          {apt.type === 'Video' ? <Video size={14} className="mt-0.5 shrink-0 text-blue-500" /> : <MapPin size={14} className="mt-0.5 shrink-0 text-teal-500" />}
+                          {apt.type}
+                        </dd>
+                      </div>
+                      <div className="min-w-0">
+                        <dt className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Phone</dt>
+                        <dd className="mt-1 flex min-w-0 items-start gap-2 break-all text-slate-700">
+                          <Phone size={14} className="mt-0.5 shrink-0 text-teal-500" /> {apt.phone || 'Not provided'}
+                        </dd>
+                      </div>
+                      <div className="min-w-0">
+                        <dt className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Payment</dt>
+                        <dd className="mt-1 flex min-w-0 items-start gap-2 break-words capitalize text-slate-700">
+                          <CreditCard size={14} className="mt-0.5 shrink-0 text-teal-500" /> {(apt.paymentMethod || 'Not provided').replace(/_/g, ' ')}
+                          {apt.bankTransferReceiptUrl ? ' � Receipt attached' : ''}
+                        </dd>
+                      </div>
+                      {apt.tokenNumber != null && (
+                        <div className="min-w-0">
+                          <dt className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Token Number</dt>
+                          <dd className="mt-1 break-words font-semibold text-slate-700">#{apt.tokenNumber}</dd>
+                        </div>
                       )}
-                      {currentApt.videoRecordingUrl && (
-                        <button onClick={() => setShowRecording(value => !value)} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700">
-                          {showRecording ? 'Hide Consultation Video' : 'Video Consultation Booking'}
+                      {apt.type === 'Video' && (
+                        <div className="min-w-0">
+                          <dt className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Video Method</dt>
+                          <dd className="mt-1 break-words text-slate-700">
+                            {apt.videoConsultationMethod === 'whatsapp' ? 'WhatsApp call' : 'Video on this platform'}
+                            {apt.videoCallStatus ? ` � ${apt.videoCallStatus}` : ''}
+                          </dd>
+                        </div>
+                      )}
+                      <div className="min-w-0 sm:col-span-2">
+                        <dt className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Reason for Visit</dt>
+                        <dd className="mt-1 break-words font-medium text-teal-700">{apt.reason || 'Not provided'}</dd>
+                      </div>
+                    </dl>
+
+                    <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedAppointment(apt)}
+                        className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl bg-teal-50 px-3 py-2 text-sm font-semibold text-teal-700"
+                      >
+                        Manage Appointment
+                      </button>
+                      {apt.videoRecordingUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setRecordingToPlay(apt.videoRecordingUrl || null)}
+                          className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white"
+                        >
+                          <PlayCircle size={16} /> Watch Video
                         </button>
                       )}
                     </div>
-                    {showRecording && currentApt.videoRecordingUrl && (
-                      <video controls preload="metadata" className="mt-4 max-h-80 w-full rounded-xl bg-black">
-                        <source src={currentApt.videoRecordingUrl} />
-                      </video>
-                    )}
-                    <p className="mt-3 text-xs text-slate-500">Patient: {currentApt.patientName} · {currentApt.age} years · {currentApt.gender} · {currentApt.phone}</p>
-                  </div>
-                )}
+                  </article>
+                ))}
+              </div>
 
-                {currentApt.paymentMethod === 'bank_transfer' && (
-                  <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl">
-                    <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
-                      <Download size={16} className="text-blue-600" /> Bank Transfer Receipt
-                    </h3>
-                    {currentApt.bankTransferReceiptUrl ? (
-                      <div className="space-y-3">
-                        <img
-                          src={currentApt.bankTransferReceiptUrl}
-                          alt="Bank transfer receipt"
-                          className="w-full max-h-48 object-contain rounded-xl border border-blue-100 bg-white"
-                        />
-                        <a
-                          href={currentApt.bankTransferReceiptUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center justify-center gap-2 py-2 px-4 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 transition-colors"
-                        >
-                          <Download size={14} /> View Full Receipt
-                        </a>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-amber-700">Receipt not yet uploaded by patient.</p>
-                    )}
-                  </div>
-                )}
+              {/* --- DESKTOP VIEW (TABLE) --- */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead className="bg-slate-50 border-b border-slate-100">
+                    <tr>
+                      <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Patient</th>
+                      <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Date & Time</th>
+                      <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Type</th>
+                      <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Reason</th>
+                      <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {paginatedAppointments.map((apt) => (
+                      <tr key={apt.id} className="hover:bg-slate-50/50 transition-colors group">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <img src={apt.avatar} alt="" className="w-10 h-10 rounded-full object-cover border border-slate-100 bg-slate-100" />
+                            <div>
+                              <p className="font-bold text-slate-800 text-sm">{apt.patientName}</p>
+                              <p className="text-xs text-slate-500">
+                                {apt.age}y, {apt.gender}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium text-slate-700">{apt.date}</span>
+                            <span className="text-xs text-slate-500">{apt.time}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2 text-sm text-slate-600">
+                            {apt.type === 'Video' ? <Video size={16} className="text-blue-500" /> : <MapPin size={16} className="text-teal-500" />}
+                            {apt.type}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-sm text-slate-700 font-medium">{apt.reason}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <StatusBadge status={apt.status} />
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          {apt.videoRecordingUrl && (
+                            <button
+                              type="button"
+                              onClick={() => setRecordingToPlay(apt.videoRecordingUrl || null)}
+                              className="mr-1 p-2 text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
+                              title="Watch consultation video"
+                            >
+                              <PlayCircle size={18} />
+                            </button>
+                          )}
+                          <button onClick={() => setSelectedAppointment(apt)} className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors">
+                            <FileText size={18} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
-                {/* Prescription */}
-                <div>
-                  <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
-                    <Pill size={16} className="text-teal-600"/> Write Prescription / Notes
-                  </h3>
-                  <textarea
-                    value={prescriptionText}
-                    onChange={(e) => setPrescriptionText(e.target.value)}
-                    placeholder="Type medicines, dosages, and medical notes here..."
-                    className="w-full h-32 p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-50 transition-all resize-y animate-fade-up"
-                  />
+              {/* Pagination Footer */}
+              {totalPages > 1 && (
+                <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/80 flex items-center justify-between">
+                  <span className="text-xs text-slate-500 font-medium">
+                    Showing {(currentPage - 1) * PAGE_SIZE + 1} to {Math.min(currentPage * PAGE_SIZE, filteredAppointments.length)} of {filteredAppointments.length} appointments
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                      className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50 cursor-pointer"
+                    >
+                      Previous
+                    </button>
+                    <span className="text-xs font-semibold text-slate-600 flex items-center px-1">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <button
+                      onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                      className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50 cursor-pointer"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+      {/* --- MODAL --- */}
+      {selectedAppointment &&
+        (() => {
+          // Resolve latest data from state
+          const currentApt = appointments.find((a) => a.id === selectedAppointment.id) || selectedAppointment;
+          return (
+            <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+              <div className="relative max-h-[100dvh] w-full max-w-2xl overflow-hidden rounded-t-2xl bg-white shadow-xl animate-fade-up sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl">
+                {/* Modal Header */}
+                <div className="flex items-start justify-between border-b border-slate-100 bg-slate-50/50 p-4 sm:p-6">
+                  <div className="flex items-center gap-4">
+                    <img src={currentApt.avatar} alt="" className="w-16 h-16 rounded-full object-cover border-2 border-white shadow-sm" />
+                    <div>
+                      <h2 className="text-xl font-bold text-slate-800">{currentApt.patientName}</h2>
+                      <p className="text-sm text-slate-500">
+                        {currentApt.age}y • {currentApt.gender} • {currentApt.phone}
+                      </p>
+                      <span className="inline-flex items-center gap-1 mt-1 text-xs font-semibold text-teal-700 bg-teal-50 border border-teal-100 px-2 py-0.5 rounded-full">{currentApt.reason}</span>
+                    </div>
+                  </div>
+                  <button onClick={() => setSelectedAppointment(null)} className="p-2 bg-white rounded-full text-slate-400 hover:text-slate-600 shadow-sm border border-slate-100">
+                    <X size={20} />
+                  </button>
                 </div>
 
-                {/* Reports upload for Doctor */}
-                <div className="space-y-3 pt-3 border-t border-slate-100 animate-fade-up">
-                  <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                    <UploadCloud size={16} className="text-teal-600"/> Patient Report Vault (PDFs)
-                  </h3>
-                  
-                  {/* Existing reports from this doctor's medical records */}
-                  {currentApt.medicalRecords && currentApt.medicalRecords.length > 0 && (() => {
-                    const allReports = currentApt.medicalRecords.flatMap((rec: any) => rec.reports || []);
-                    return allReports.length > 0 ? (
+                {/* Modal Body */}
+                <div className="max-h-[calc(100dvh-9rem)] space-y-5 overflow-y-auto p-4 sm:max-h-[70vh] sm:space-y-6 sm:p-6">
+                  {/* Info Grid — Time | Status | Reason */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Time</p>
+                      <p className="font-medium text-slate-800">{currentApt.date}</p>
+                      <p className="text-sm text-slate-500">{currentApt.time}</p>
+                    </div>
+
+                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Status</p>
+                      <div className="mt-1">
+                        <StatusBadge status={currentApt.status} />
+                      </div>
+                    </div>
+
+                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Reason for Visit</p>
+                      <input
+                        value={reasonText}
+                        onChange={(e) => setReasonText(e.target.value)}
+                        placeholder="e.g. Cardiology"
+                        className="w-full mt-1 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm text-slate-800 font-medium focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-50 transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Bank Transfer Receipt */}
+                  {currentApt.type === 'Video' && (
+                    <div className="rounded-xl border border-teal-100 bg-teal-50/40 p-4">
+                      <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Patient's selected video method</p>
+                      <p className="mt-1 font-bold text-slate-800">{currentApt.videoConsultationMethod === 'whatsapp' ? 'WhatsApp Video Call' : 'Video on this platform'}</p>
+                      <div className="mt-3 flex flex-wrap items-center gap-3">
+                        {currentApt.videoConsultationMethod === 'whatsapp' ? (
+                          <a
+                            href={`https://wa.me/92${String(currentApt.phone || '')
+                              .replace(/\D/g, '')
+                              .replace(/^0/, '')}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white"
+                          >
+                            Contact on WhatsApp
+                          </a>
+                        ) : (
+                          <VideoConsultationRoom appointmentId={currentApt.id} role="doctor" otherPartyName={currentApt.patientName} consultationMethod={currentApt.videoConsultationMethod} />
+                        )}
+                        {currentApt.videoRecordingUrl && (
+                          <button onClick={() => setShowRecording((value) => !value)} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700">
+                            {showRecording ? 'Hide Consultation Video' : 'Watch Consultation Video'}
+                          </button>
+                        )}
+                      </div>
+                      {showRecording && currentApt.videoRecordingUrl && (
+                        <video controls preload="metadata" className="mt-4 max-h-80 w-full rounded-xl bg-black">
+                          <source src={currentApt.videoRecordingUrl} />
+                        </video>
+                      )}
+                      <p className="mt-3 text-xs text-slate-500">
+                        Patient: {currentApt.patientName} · {currentApt.age} years · {currentApt.gender} · {currentApt.phone}
+                      </p>
+                    </div>
+                  )}
+
+                  {currentApt.paymentMethod === 'bank_transfer' && (
+                    <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl">
+                      <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                        <Download size={16} className="text-blue-600" /> Bank Transfer Receipt
+                      </h3>
+                      {currentApt.bankTransferReceiptUrl ? (
+                        <div className="space-y-3">
+                          <img src={currentApt.bankTransferReceiptUrl} alt="Bank transfer receipt" className="w-full max-h-48 object-contain rounded-xl border border-blue-100 bg-white" />
+                          <a
+                            href={currentApt.bankTransferReceiptUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-center gap-2 py-2 px-4 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 transition-colors"
+                          >
+                            <Download size={14} /> View Full Receipt
+                          </a>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-amber-700">Receipt not yet uploaded by patient.</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Prescription */}
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                      <Pill size={16} className="text-teal-600" /> Write Prescription / Notes
+                    </h3>
+                    <textarea
+                      value={prescriptionText}
+                      onChange={(e) => setPrescriptionText(e.target.value)}
+                      placeholder="Type medicines, dosages, and medical notes here..."
+                      className="w-full h-32 p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-50 transition-all resize-y animate-fade-up"
+                    />
+                  </div>
+
+                  {/* Reports upload for Doctor */}
+                  <div className="space-y-3 pt-3 border-t border-slate-100 animate-fade-up">
+                    <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                      <UploadCloud size={16} className="text-teal-600" /> Patient Report Vault (PDFs)
+                    </h3>
+
+                    {/* Existing reports from this doctor's medical records */}
+                    {currentApt.medicalRecords &&
+                      currentApt.medicalRecords.length > 0 &&
+                      (() => {
+                        const allReports = currentApt.medicalRecords.flatMap((rec: any) => rec.reports || []);
+                        return allReports.length > 0 ? (
+                          <div className="space-y-2">
+                            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Saved Reports</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              {allReports.map((url: string, uIdx: number) => (
+                                <button
+                                  type="button"
+                                  key={uIdx}
+                                  onClick={() => void downloadPdf(url, `report-${uIdx + 1}.pdf`)}
+                                  className="flex items-center gap-2 p-3 rounded-xl border border-slate-100 bg-slate-50 hover:bg-teal-50 hover:border-teal-200 transition-all group"
+                                >
+                                  <div className="p-1.5 rounded-lg bg-rose-50 shrink-0">
+                                    <FileText size={14} className="text-rose-500" />
+                                  </div>
+                                  <span className="text-xs font-semibold text-slate-700 truncate flex-1">Report #{uIdx + 1}.pdf</span>
+                                  <span className="text-[10px] text-teal-600 font-bold group-hover:underline shrink-0">↓ Download</span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null;
+                      })()}
+
+                    {/* Newly uploaded in this session */}
+                    {uploadedReports.length > 0 && (
                       <div className="space-y-2">
-                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Saved Reports</p>
+                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Just Uploaded (Session)</p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {allReports.map((url: string, uIdx: number) => (
+                          {uploadedReports.map((url, uIdx) => (
                             <button
                               type="button"
                               key={uIdx}
-                              onClick={() => void downloadPdf(url, `report-${uIdx + 1}.pdf`)}
-                              className="flex items-center gap-2 p-3 rounded-xl border border-slate-100 bg-slate-50 hover:bg-teal-50 hover:border-teal-200 transition-all group"
+                              onClick={() => void downloadPdf(url, `new-report-${uIdx + 1}.pdf`)}
+                              className="flex items-center gap-2 p-3 rounded-xl border border-teal-100 bg-teal-50/50 group"
                             >
-                              <div className="p-1.5 rounded-lg bg-rose-50 shrink-0">
-                                <FileText size={14} className="text-rose-500" />
-                              </div>
-                              <span className="text-xs font-semibold text-slate-700 truncate flex-1">Report #{uIdx + 1}.pdf</span>
+                              <FileText size={16} className="text-teal-500 shrink-0" />
+                              <span className="text-xs font-semibold text-slate-700 truncate flex-1">New Report #{uIdx + 1}.pdf</span>
                               <span className="text-[10px] text-teal-600 font-bold group-hover:underline shrink-0">↓ Download</span>
                             </button>
                           ))}
                         </div>
                       </div>
-                    ) : null;
-                  })()}
+                    )}
 
-                  {/* Newly uploaded in this session */}
-                  {uploadedReports.length > 0 && (
-                    <div className="space-y-2">
-                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Just Uploaded (Session)</p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {uploadedReports.map((url, uIdx) => (
-                          <button
-                            type="button"
-                            key={uIdx}
-                            onClick={() => void downloadPdf(url, `new-report-${uIdx + 1}.pdf`)}
-                            className="flex items-center gap-2 p-3 rounded-xl border border-teal-100 bg-teal-50/50 group"
-                          >
-                            <FileText size={16} className="text-teal-500 shrink-0" />
-                            <span className="text-xs font-semibold text-slate-700 truncate flex-1">New Report #{uIdx + 1}.pdf</span>
-                            <span className="text-[10px] text-teal-600 font-bold group-hover:underline shrink-0">↓ Download</span>
-                          </button>
-                        ))}
+                    <label className="relative flex flex-col items-center justify-center border-2 border-dashed border-slate-200 hover:border-teal-500/30 rounded-xl p-4 bg-slate-50/50 hover:bg-slate-50 cursor-pointer transition-all">
+                      {isUploading ? (
+                        <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+                          <Loader2 size={16} className="animate-spin text-teal-600" />
+                          <span>Uploading PDF documents...</span>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center text-center">
+                          <UploadCloud size={20} className="text-teal-600 mb-1.5" />
+                          <span className="text-xs font-bold text-slate-700">Attach PDF Patient Reports</span>
+                          <span className="text-[10px] text-slate-400 mt-0.5">Click to choose one or more files to attach to this visit record</span>
+                        </div>
+                      )}
+                      <input type="file" accept="application/pdf" multiple disabled={isUploading} onChange={handleUploadReport} className="hidden" />
+                    </label>
+                  </div>
+
+                  {/* Status Actions */}
+                  {currentApt.status === 'Upcoming' && (
+                    <div className="pt-4 border-t border-slate-100">
+                      <h3 className="text-sm font-bold text-slate-800 mb-3">Quick Actions</h3>
+                      <div className="flex flex-col sm:flex-row gap-3">
+                        <button
+                          onClick={() => handleUpdateStatus(currentApt.id, 'Completed')}
+                          className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-green-50 text-green-700 hover:bg-green-100 font-semibold rounded-xl transition-colors"
+                        >
+                          <CheckCircle size={18} /> Mark as Completed
+                        </button>
+                        <button
+                          onClick={() => handleUpdateStatus(currentApt.id, 'Cancelled')}
+                          className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-red-50 text-red-700 hover:bg-red-100 font-semibold rounded-xl transition-colors"
+                        >
+                          <XCircle size={18} /> Cancel Appointment
+                        </button>
                       </div>
                     </div>
                   )}
-
-                  <label className="relative flex flex-col items-center justify-center border-2 border-dashed border-slate-200 hover:border-teal-500/30 rounded-xl p-4 bg-slate-50/50 hover:bg-slate-50 cursor-pointer transition-all">
-                    {isUploading ? (
-                      <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-                        <Loader2 size={16} className="animate-spin text-teal-600" />
-                        <span>Uploading PDF documents...</span>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center text-center">
-                        <UploadCloud size={20} className="text-teal-600 mb-1.5" />
-                        <span className="text-xs font-bold text-slate-700">Attach PDF Patient Reports</span>
-                        <span className="text-[10px] text-slate-400 mt-0.5">Click to choose one or more files to attach to this visit record</span>
-                      </div>
-                    )}
-                    <input 
-                      type="file" 
-                      accept="application/pdf" 
-                      multiple 
-                      disabled={isUploading}
-                      onChange={handleUploadReport}
-                      className="hidden" 
-                    />
-                  </label>
                 </div>
 
-                {/* Status Actions */}
-                {currentApt.status === 'Upcoming' && (
-                  <div className="pt-4 border-t border-slate-100">
-                    <h3 className="text-sm font-bold text-slate-800 mb-3">Quick Actions</h3>
-                    <div className="flex flex-col sm:flex-row gap-3">
-                      <button
-                        onClick={() => handleUpdateStatus(currentApt.id, 'Completed')}
-                        className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-green-50 text-green-700 hover:bg-green-100 font-semibold rounded-xl transition-colors"
-                      >
-                        <CheckCircle size={18} /> Mark as Completed
-                      </button>
-                      <button
-                        onClick={() => handleUpdateStatus(currentApt.id, 'Cancelled')}
-                        className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-red-50 text-red-700 hover:bg-red-100 font-semibold rounded-xl transition-colors"
-                      >
-                        <XCircle size={18} /> Cancel Appointment
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Modal Footer */}
-              <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
-                <button
-                  onClick={() => setSelectedAppointment(null)}
-                  className="px-5 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-200 bg-slate-100 rounded-xl transition-colors"
-                >
-                  Close
-                </button>
-                <button
-                  onClick={handleSavePrescription}
-                  className="px-5 py-2.5 text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 rounded-xl transition-colors shadow-sm"
-                >
-                  Save File
-                </button>
+                {/* Modal Footer */}
+                <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
+                  <button onClick={() => setSelectedAppointment(null)} className="px-5 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-200 bg-slate-100 rounded-xl transition-colors">
+                    Close
+                  </button>
+                  <button onClick={handleSavePrescription} className="px-5 py-2.5 text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 rounded-xl transition-colors shadow-sm">
+                    Save File
+                  </button>
+                </div>
               </div>
             </div>
+          );
+        })()}
+      {recordingToPlay && (
+        <div className="fixed inset-0 z-[130] flex items-end justify-center bg-slate-950/90 p-0 sm:items-center sm:p-4">
+          <div className="w-full max-w-5xl overflow-hidden rounded-t-2xl bg-slate-900 shadow-2xl sm:rounded-2xl">
+            <div className="flex items-center justify-between border-b border-white/10 px-5 py-4 text-white">
+              <h2 className="font-bold">Recorded Video Consultation</h2>
+              <button type="button" onClick={() => setRecordingToPlay(null)} className="rounded-full p-2 hover:bg-white/10" aria-label="Close video">
+                <X size={20} />
+              </button>
+            </div>
+            <video src={recordingToPlay} controls autoPlay preload="metadata" className="max-h-[75vh] w-full bg-black" />
           </div>
-        );
-      })()}
+        </div>
+      )}{' '}
     </DashboardShell>
   );
 }

@@ -1,20 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import {
-  Calendar,
-  Clock,
-  MapPin,
-  Video,
-  Search,
-  Filter,
-  CalendarCheck,
-  Bell,
-  Plus,
-  X,
-  CheckCircle2,
-  AlertCircle,
-} from 'lucide-react';
+import { Calendar, Clock, MapPin, Video, Search, Filter, CalendarCheck, Bell, Plus, X, CheckCircle2, AlertCircle, PlayCircle } from 'lucide-react';
 import DashboardShell from '@/components/layouts/DashboardShell';
 import { getToken } from '@/app/actions/token';
 import Image from 'next/image';
@@ -60,11 +47,14 @@ interface AppointmentApiResponse {
 
 const StatusBadge = ({ status }: { status: AppointmentStatus }) => {
   const statusLower = status?.toLowerCase();
-  const normalizedStatus = 
-    statusLower === 'upcoming' || statusLower === 'pending' ? 'Pending' :
-    statusLower === 'checked-in' || statusLower === 'in-progress' || statusLower === 'confirmed' ? 'Confirmed' :
-    statusLower === 'completed' ? 'Completed' :
-    'Cancelled';
+  const normalizedStatus =
+    statusLower === 'upcoming' || statusLower === 'pending'
+      ? 'Pending'
+      : statusLower === 'checked-in' || statusLower === 'in-progress' || statusLower === 'confirmed'
+        ? 'Confirmed'
+        : statusLower === 'completed'
+          ? 'Completed'
+          : 'Cancelled';
 
   const styles = {
     Confirmed: 'bg-[#20AC6B]/10 text-[#20AC6B] border-[#20AC6B]/20',
@@ -96,9 +86,7 @@ const EmptyState = () => (
       <Calendar className="w-7 h-7 text-slate-300" />
     </div>
     <h3 className="text-lg font-bold text-slate-800">No appointments found</h3>
-    <p className="text-slate-400 text-sm max-w-xs mt-2 mb-6">
-      You don&apos;t have any appointments in this category yet.
-    </p>
+    <p className="text-slate-400 text-sm max-w-xs mt-2 mb-6">You don&apos;t have any appointments in this category yet.</p>
     <button className="flex items-center gap-2 bg-gradient-to-r from-[#16BCC8] to-[#0ea5a9] text-white px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 shadow-[0_2px_12px_rgba(22,188,200,0.3)] hover:shadow-[0_4px_20px_rgba(22,188,200,0.4)]">
       <Plus size={18} />
       Book Appointment
@@ -111,6 +99,17 @@ export default function MyAppointments() {
   const [searchQuery, setSearchQuery] = useState('');
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [recordingToPlay, setRecordingToPlay] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleRecordingSaved = (event: Event) => {
+      const detail = (event as CustomEvent<{ appointmentId: string; url: string }>).detail;
+      if (!detail?.appointmentId || !detail.url) return;
+      setAppointments((current) => current.map((appointment) => (appointment.id === detail.appointmentId ? { ...appointment, videoRecordingUrl: detail.url } : appointment)));
+    };
+    window.addEventListener('medibook:recording-saved', handleRecordingSaved);
+    return () => window.removeEventListener('medibook:recording-saved', handleRecordingSaved);
+  }, []);
 
   const fetchAppointments = async () => {
     try {
@@ -120,8 +119,8 @@ export default function MyAppointments() {
       const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL;
       const res = await fetch(`${serverUrl}/patient/my-appointments`, {
         headers: {
-          'Authorization': `Bearer ${token.replace(/"/g, '').trim()}`,
-        }
+          Authorization: `Bearer ${token.replace(/"/g, '').trim()}`,
+        },
       });
       if (res.ok) {
         const data = await res.json();
@@ -167,8 +166,8 @@ export default function MyAppointments() {
             // Verify Stripe Session
             const res = await fetch(`${serverUrl}/payment/verify-checkout-session/${sessionId}`, {
               headers: {
-                'Authorization': `Bearer ${cleanToken}`,
-              }
+                Authorization: `Bearer ${cleanToken}`,
+              },
             });
             if (res.ok) {
               alert('Stripe card payment verified and slot booked successfully!');
@@ -183,10 +182,10 @@ export default function MyAppointments() {
             const res = await fetch(`${serverUrl}/payment/jazzcash/verify-mock`, {
               method: 'POST',
               headers: {
-                'Authorization': `Bearer ${cleanToken}`,
+                Authorization: `Bearer ${cleanToken}`,
                 'Content-Type': 'application/json',
               },
-              body: JSON.stringify({ description: decodeURIComponent(mockJc) })
+              body: JSON.stringify({ description: decodeURIComponent(mockJc) }),
             });
             if (res.ok) {
               alert('JazzCash payment completed and slot booked successfully!');
@@ -198,10 +197,10 @@ export default function MyAppointments() {
             const res = await fetch(`${serverUrl}/payment/easypaisa/verify-mock`, {
               method: 'POST',
               headers: {
-                'Authorization': `Bearer ${cleanToken}`,
+                Authorization: `Bearer ${cleanToken}`,
                 'Content-Type': 'application/json',
               },
-              body: JSON.stringify({ description: decodeURIComponent(mockEp) })
+              body: JSON.stringify({ description: decodeURIComponent(mockEp) }),
             });
             if (res.ok) {
               alert('EasyPaisa payment completed and slot booked successfully!');
@@ -223,186 +222,199 @@ export default function MyAppointments() {
   }, []);
 
   // Filter Logic
-  const filteredAppointments = appointments.filter(apt => {
+  const filteredAppointments = appointments.filter((apt) => {
     const statusLower = apt.status?.toLowerCase();
-    const matchesTab = 
-      activeTab === 'Upcoming' ? (statusLower === 'confirmed' || statusLower === 'pending' || statusLower === 'checked-in' || statusLower === 'in-progress' || statusLower === 'upcoming') :
-      activeTab === 'Completed' ? statusLower === 'completed' :
-      statusLower === 'cancelled';
-    
-    const matchesSearch = apt.doctorName.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          apt.specialty.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesTab =
+      activeTab === 'Upcoming'
+        ? statusLower === 'confirmed' || statusLower === 'pending' || statusLower === 'checked-in' || statusLower === 'in-progress' || statusLower === 'upcoming'
+        : activeTab === 'Completed'
+          ? statusLower === 'completed'
+          : statusLower === 'cancelled';
+
+    const matchesSearch = apt.doctorName.toLowerCase().includes(searchQuery.toLowerCase()) || apt.specialty.toLowerCase().includes(searchQuery.toLowerCase());
 
     return matchesTab && matchesSearch;
   });
 
   return (
     <DashboardShell role="patient" activeHref="/patient/appointments">
-        <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl border-b border-slate-100 px-4 sm:px-6 py-4 flex items-center justify-between">
-          <h1 className="text-lg sm:text-xl font-bold text-slate-800">My Appointments</h1>
+      <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl border-b border-slate-100 px-4 sm:px-6 py-4 flex items-center justify-between">
+        <h1 className="text-lg sm:text-xl font-bold text-slate-800">My Appointments</h1>
 
-
-          <div className="flex items-center gap-4">
-            <button className="relative p-2.5 rounded-xl hover:bg-slate-50 transition-all duration-200 border border-transparent hover:border-slate-100">
-              <Bell className="w-5 h-5 text-slate-400" />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-            </button>
-            <Image 
-              src={""} 
-              alt="Profile" 
-              width={40} 
-              height={40} 
-              className="w-10 h-10 rounded-xl border-2 border-white shadow-sm" 
-            />
-          </div>
-        </header>
-
-        <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-6">
-          
-          {/* Controls: Tabs & Search */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 animate-fade-up">
-            
-            {/* Tabs */}
-            <div className="bg-slate-100/80 p-1 rounded-xl flex items-center w-full md:w-auto">
-              {(['Upcoming', 'Completed', 'Cancelled'] as const).map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`flex-1 md:flex-none px-6 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
-                    activeTab === tab 
-                      ? 'bg-white text-[#16BCC8] shadow-sm' 
-                      : 'text-slate-500 hover:text-slate-700'
-                  }`}
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
-
-            {/* Search & Filter */}
-            <div className="flex gap-3 w-full md:w-auto">
-              <div className="flex-1 md:w-72 flex items-center bg-white border border-slate-200 rounded-xl px-4 py-2.5 focus-within:ring-2 focus-within:ring-[#16BCC8]/20 focus-within:border-[#16BCC8] transition-all duration-200">
-                <Search className="text-slate-300 w-4 h-4" />
-                <input 
-                  type="text" 
-                  placeholder="Search doctor or specialty..." 
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="bg-transparent border-none outline-none text-sm ml-2 w-full text-slate-700 placeholder:text-slate-300"
-                />
-              </div>
-              <button className="bg-white border border-slate-200 p-2.5 rounded-xl text-slate-400 hover:bg-slate-50 hover:text-[#16BCC8] hover:border-[#16BCC8]/20 transition-all duration-200">
-                <Filter size={20} />
+        <div className="flex items-center gap-4">
+          <button className="relative p-2.5 rounded-xl hover:bg-slate-50 transition-all duration-200 border border-transparent hover:border-slate-100">
+            <Bell className="w-5 h-5 text-slate-400" />
+            <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+          </button>
+          <Image src={''} alt="Profile" width={40} height={40} className="w-10 h-10 rounded-xl border-2 border-white shadow-sm" />
+        </div>
+      </header>
+      <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-6">
+        {/* Controls: Tabs & Search */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 animate-fade-up">
+          {/* Tabs */}
+          <div className="flex w-full items-center rounded-xl bg-slate-100/80 p-1 md:w-auto">
+            {(['Upcoming', 'Completed', 'Cancelled'] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`flex-1 rounded-xl px-2 py-2.5 text-xs font-semibold sm:px-4 sm:text-sm md:flex-none md:px-6 transition-all duration-200 ${
+                  activeTab === tab ? 'bg-white text-[#16BCC8] shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                {tab}
               </button>
-            </div>
+            ))}
           </div>
 
-          {/* Reminder Banner (Only for Upcoming) */}
-          {activeTab === 'Upcoming' && filteredAppointments.length > 0 && (
-            <div className="bg-gradient-to-r from-[#16BCC8]/8 to-[#0ea5a9]/5 border border-[#16BCC8]/10 rounded-2xl p-4 flex items-start gap-4 animate-slide-down">
-              <div className="p-2 bg-[#16BCC8]/10 text-[#16BCC8] rounded-xl shrink-0">
-                <AlertCircle size={18} />
-              </div>
-              <div>
-                <h4 className="font-bold text-[#16BCC8] text-sm">Don&apos;t forget!</h4>
-                <p className="text-slate-500 text-xs mt-1">
-                  Your next appointment is with {filteredAppointments[0].doctorName} on {filteredAppointments[0].date} at {filteredAppointments[0].time}.
-                </p>
-              </div>
+          {/* Search & Filter */}
+          <div className="flex w-full min-w-0 gap-2 sm:gap-3 md:w-auto">
+            <div className="flex min-w-0 flex-1 items-center md:w-72 bg-white border border-slate-200 rounded-xl px-4 py-2.5 focus-within:ring-2 focus-within:ring-[#16BCC8]/20 focus-within:border-[#16BCC8] transition-all duration-200">
+              <Search className="text-slate-300 w-4 h-4" />
+              <input
+                type="text"
+                placeholder="Search doctor or specialty..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="bg-transparent border-none outline-none text-sm ml-2 w-full text-slate-700 placeholder:text-slate-300"
+              />
             </div>
-          )}
+            <button className="shrink-0 bg-white border border-slate-200 p-2.5 rounded-xl text-slate-400 hover:bg-slate-50 hover:text-[#16BCC8] hover:border-[#16BCC8]/20 transition-all duration-200">
+              <Filter size={20} />
+            </button>
+          </div>
+        </div>
 
-          {/* Appointments List */}
-          <div className="space-y-4">
-            {isLoading ? (
-              <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-slate-100 shadow-sm">
-                <div className="h-8 w-8 border-2 border-teal-600/30 border-t-teal-600 rounded-full animate-spin mb-4" />
-                <p className="text-slate-500 font-medium text-sm">Loading appointments...</p>
-              </div>
-            ) : filteredAppointments.length === 0 ? (
-              <EmptyState />
-            ) : (
-              filteredAppointments.map((apt, index) => (
-                <div key={apt.id} className={`group bg-white border border-slate-100 rounded-2xl p-5 hover:shadow-elevated hover:border-[#16BCC8]/10 transition-all duration-300 animate-fade-up stagger-${Math.min(index + 1, 6)}`}>
-                  <div className="flex flex-col md:flex-row md:items-center gap-6">
-                    
-                    {/* Date Block (Desktop Only) */}
-                    <div className="hidden md:flex flex-col items-center justify-center w-20 h-20 bg-slate-50 rounded-2xl border border-slate-100 shrink-0 group-hover:border-[#16BCC8]/15 transition-all duration-200">
-                      <span className="text-xs font-bold text-slate-400 uppercase">{apt.date.split(' ')[0]}</span>
-                      <span className="text-2xl font-extrabold text-slate-800">{apt.date.split(' ')[1].replace(',', '')}</span>
+        {/* Reminder Banner (Only for Upcoming) */}
+        {activeTab === 'Upcoming' && filteredAppointments.length > 0 && (
+          <div className="bg-gradient-to-r from-[#16BCC8]/8 to-[#0ea5a9]/5 border border-[#16BCC8]/10 rounded-2xl p-4 flex items-start gap-4 animate-slide-down">
+            <div className="p-2 bg-[#16BCC8]/10 text-[#16BCC8] rounded-xl shrink-0">
+              <AlertCircle size={18} />
+            </div>
+            <div>
+              <h4 className="font-bold text-[#16BCC8] text-sm">Don&apos;t forget!</h4>
+              <p className="text-slate-500 text-xs mt-1">
+                Your next appointment is with {filteredAppointments[0].doctorName} on {filteredAppointments[0].date} at {filteredAppointments[0].time}.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Appointments List */}
+        <div className="space-y-4">
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-slate-100 shadow-sm">
+              <div className="h-8 w-8 border-2 border-teal-600/30 border-t-teal-600 rounded-full animate-spin mb-4" />
+              <p className="text-slate-500 font-medium text-sm">Loading appointments...</p>
+            </div>
+          ) : filteredAppointments.length === 0 ? (
+            <EmptyState />
+          ) : (
+            filteredAppointments.map((apt, index) => (
+              <div
+                key={apt.id}
+                className={`group bg-white border border-slate-100 rounded-2xl p-4 sm:p-5 hover:shadow-elevated hover:border-[#16BCC8]/10 transition-all duration-300 animate-fade-up stagger-${Math.min(index + 1, 6)}`}
+              >
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:gap-6">
+                  {/* Date Block (Desktop Only) */}
+                  <div className="hidden md:flex flex-col items-center justify-center w-20 h-20 bg-slate-50 rounded-2xl border border-slate-100 shrink-0 group-hover:border-[#16BCC8]/15 transition-all duration-200">
+                    <span className="text-xs font-bold text-slate-400 uppercase">{apt.date.split(' ')[0]}</span>
+                    <span className="text-2xl font-extrabold text-slate-800">{apt.date.split(' ')[1].replace(',', '')}</span>
+                  </div>
+
+                  {/* Main Info */}
+                  <div className="flex min-w-0 flex-1 items-start gap-3 sm:items-center sm:gap-4">
+                    <div className="relative shrink-0">
+                      <img src={apt.avatar} alt={apt.doctorName} className="h-12 w-12 rounded-xl sm:h-16 sm:w-16 sm:rounded-2xl object-cover border-2 border-slate-50 shadow-sm" />
+                      <div className={`absolute -bottom-1 -right-1 p-1 rounded-full border-2 border-white text-white ${apt.type === 'Video' ? 'bg-blue-500' : 'bg-[#16BCC8]'}`}>
+                        {apt.type === 'Video' ? <Video size={9} /> : <MapPin size={9} />}
+                      </div>
                     </div>
 
-                    {/* Main Info */}
-                    <div className="flex-1 flex flex-col sm:flex-row sm:items-center gap-4">
-                      <div className="relative shrink-0">
-                         <img src={apt.avatar} alt={apt.doctorName} className="w-16 h-16 rounded-2xl object-cover border-2 border-slate-50 shadow-sm" />
-                         <div className={`absolute -bottom-1 -right-1 p-1 rounded-full border-2 border-white text-white ${apt.type === 'Video' ? 'bg-blue-500' : 'bg-[#16BCC8]'}`}>
-                           {apt.type === 'Video' ? <Video size={9} /> : <MapPin size={9} />}
-                         </div>
-                      </div>
-                      
-                      <div className="flex-1">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h3 className="font-bold text-lg text-slate-800 group-hover:text-[#16BCC8] transition-colors duration-200">{apt.doctorName}</h3>
-                            <p className="text-sm text-slate-400 font-medium">{apt.specialty}</p>
-                          </div>
-                          {/* Mobile Date shown here since block is hidden */}
-                          <div className="md:hidden text-right">
-                             <p className="text-sm font-bold text-slate-800">{apt.date}</p>
-                             <p className="text-xs text-slate-400">{apt.time}</p>
-                          </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <h3 className="font-bold text-lg text-slate-800 group-hover:text-[#16BCC8] transition-colors duration-200">{apt.doctorName}</h3>
+                          <p className="text-sm text-slate-400 font-medium">{apt.specialty}</p>
                         </div>
-                        
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-2 text-xs text-slate-400">
-                          <span className="hidden md:flex items-center gap-1"><Clock size={13} /> {apt.time}</span>
-                          <span className="flex items-center gap-1">
-                            {apt.type === 'Video' ? <Video size={13} /> : <MapPin size={13} />} 
-                            {apt.type === 'Video' ? 'Online Video Call' : apt.location}
-                          </span>
+                        {/* Mobile Date shown here since block is hidden */}
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-left md:hidden">
+                          <p className="text-xs font-bold text-slate-700">{apt.date}</p>
+                          <p className="text-xs text-slate-400">{apt.time}</p>
                         </div>
                       </div>
-                    </div>
 
-                    {/* Status & Actions */}
-                    <div className="flex flex-row md:flex-col items-center md:items-end justify-between md:justify-center gap-4 border-t md:border-t-0 md:border-l border-slate-50 pt-4 md:pt-0 md:pl-6 min-w-[140px]">
-                      <StatusBadge status={apt.status} />
-                      
-                      <div className="flex items-center gap-2">
-                        {['confirmed', 'pending', 'checked-in', 'in-progress', 'upcoming'].includes(apt.status.toLowerCase()) ? (
-                          <>
-                            {apt.type === 'Video' && apt.videoConsultationMethod !== 'whatsapp' && (
-                              <VideoConsultationRoom appointmentId={apt.id} role="patient" otherPartyName={apt.doctorName} consultationMethod={apt.videoConsultationMethod} compact />
-                            )}
-                            <Link
-                              href={`/patient/appointments/${apt.id}`}
-                              className="px-4 py-2 bg-gradient-to-r from-[#16BCC8] to-[#0ea5a9] text-white text-sm font-semibold rounded-xl transition-all duration-300 shadow-sm hover:shadow-[0_2px_12px_rgba(22,188,200,0.3)]"
-                            >
-                              View Details
-                            </Link>
-                            <button className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all duration-200" title="Cancel Appointment">
-                              <X size={18} />
-                            </button>
-                          </>
-                        ) : apt.status === 'Completed' ? (
-                           <button className="px-4 py-2 bg-white border border-slate-200 hover:border-[#16BCC8]/30 hover:text-[#16BCC8] text-slate-600 text-sm font-semibold rounded-xl transition-all duration-200">
-                             Leave Review
-                           </button>
-                        ) : (
-                          <button className="px-4 py-2 bg-slate-50 hover:bg-[#16BCC8]/8 hover:text-[#16BCC8] text-slate-500 text-sm font-semibold rounded-xl transition-all duration-200">
-                             Book Again
-                           </button>
-                        )}
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-2 text-xs text-slate-400">
+                        <span className="hidden md:flex items-center gap-1">
+                          <Clock size={13} /> {apt.time}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          {apt.type === 'Video' ? <Video size={13} /> : <MapPin size={13} />}
+                          {apt.type === 'Video' ? 'Online Video Call' : apt.location}
+                        </span>
                       </div>
                     </div>
+                  </div>
 
+                  {/* Status & Actions */}
+                  <div className="flex w-full flex-col items-stretch justify-between gap-3 border-t border-slate-50 pt-4 sm:flex-row sm:items-center md:w-auto md:min-w-[140px] md:flex-col md:items-end md:justify-center md:gap-4 md:border-t-0 md:border-l md:pl-6 md:pt-0">
+                    <StatusBadge status={apt.status} />
+
+                    <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto md:justify-end">
+                      {apt.videoRecordingUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setRecordingToPlay(apt.videoRecordingUrl || null)}
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-teal-200 bg-teal-50 px-3 py-2 text-sm font-semibold text-teal-700"
+                        >
+                          <PlayCircle size={16} /> Watch Video
+                        </button>
+                      )}
+                      {['confirmed', 'pending', 'checked-in', 'in-progress', 'upcoming'].includes(apt.status.toLowerCase()) ? (
+                        <>
+                          {apt.type === 'Video' && apt.videoConsultationMethod !== 'whatsapp' && (
+                            <VideoConsultationRoom appointmentId={apt.id} role="patient" otherPartyName={apt.doctorName} consultationMethod={apt.videoConsultationMethod} compact />
+                          )}
+                          <Link
+                            href={`/patient/appointments/${apt.id}`}
+                            className="flex-1 whitespace-nowrap px-4 py-2 text-center sm:flex-none bg-gradient-to-r from-[#16BCC8] to-[#0ea5a9] text-white text-sm font-semibold rounded-xl transition-all duration-300 shadow-sm hover:shadow-[0_2px_12px_rgba(22,188,200,0.3)]"
+                          >
+                            View Details
+                          </Link>
+                          <button className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all duration-200" title="Cancel Appointment">
+                            <X size={18} />
+                          </button>
+                        </>
+                      ) : apt.status === 'Completed' ? (
+                        <button className="px-4 py-2 bg-white border border-slate-200 hover:border-[#16BCC8]/30 hover:text-[#16BCC8] text-slate-600 text-sm font-semibold rounded-xl transition-all duration-200">
+                          Leave Review
+                        </button>
+                      ) : (
+                        <button className="px-4 py-2 bg-slate-50 hover:bg-[#16BCC8]/8 hover:text-[#16BCC8] text-slate-500 text-sm font-semibold rounded-xl transition-all duration-200">
+                          Book Again
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
-              ))
-            )}
-          </div>
-
+              </div>
+            ))
+          )}
         </div>
+      </div>
+      {recordingToPlay && (
+        <div className="fixed inset-0 z-[120] flex items-end justify-center bg-slate-950/90 p-0 sm:items-center sm:p-4">
+          <div className="w-full max-w-5xl overflow-hidden rounded-t-2xl bg-slate-900 shadow-2xl sm:rounded-2xl">
+            <div className="flex items-center justify-between border-b border-white/10 px-5 py-4 text-white">
+              <h2 className="font-bold">Recorded Video Consultation</h2>
+              <button type="button" onClick={() => setRecordingToPlay(null)} className="rounded-full p-2 hover:bg-white/10" aria-label="Close video">
+                <X size={20} />
+              </button>
+            </div>
+            <video src={recordingToPlay} controls autoPlay preload="metadata" className="max-h-[75vh] w-full bg-black" />
+          </div>
+        </div>
+      )}{' '}
     </DashboardShell>
   );
 }

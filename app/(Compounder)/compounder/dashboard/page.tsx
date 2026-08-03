@@ -212,7 +212,7 @@ export default function CompounderDashboard() {
           <p className="text-slate-500 font-medium">Loading clinic queue details...</p>
         </div>
       ) : (
-        <div className="p-6 lg:p-8 max-w-[1600px] mx-auto space-y-8 animate-fade-up">
+        <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto space-y-8 animate-fade-up">
           {invitations.length > 0 && (
             <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
               <h2 className="font-bold text-amber-900">Doctor Invitations</h2>
@@ -240,7 +240,7 @@ export default function CompounderDashboard() {
           )}
 
           {/* Daily Stats Grid */}
-          <section className="grid grid-cols-2 lg:grid-cols-4 gap-5">
+          <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:gap-5">
             {[
               {
                 label: "Today's Bookings",
@@ -271,7 +271,7 @@ export default function CompounderDashboard() {
                 bg: 'bg-emerald-50',
               },
             ].map((stat, i) => (
-              <div key={i} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-card hover:-translate-y-0.5 transition-all duration-300">
+              <div key={i} className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-100 shadow-card hover:-translate-y-0.5 transition-all duration-300">
                 <div className="flex justify-between items-start mb-4">
                   <div className={`p-3 rounded-xl ${stat.bg}`}>
                     <stat.icon className={`w-6 h-6 ${stat.color}`} />

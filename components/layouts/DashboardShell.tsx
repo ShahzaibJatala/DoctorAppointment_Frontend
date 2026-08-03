@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useTransition } from "react";
+import React, { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -21,6 +21,8 @@ import {
 } from "lucide-react";
 import { removeToken, getToken } from "@/app/actions/token";
 import { jwtDecode } from "jwt-decode";
+import { io, type Socket } from "socket.io-client";
+import VideoConsultationRoom from "@/components/video/VideoConsultationRoom";
 
 type Role = "patient" | "doctor" | "admin" | "compounder";
 
@@ -50,9 +52,17 @@ const NAV_CONFIG: Record<Role, NavItem[]> = {
     { href: "/admin/users", label: "Users", icon: Users },
   ],
   compounder: [
-    { href: "/compounder/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    {
+      href: "/compounder/dashboard",
+      label: "Dashboard",
+      icon: LayoutDashboard,
+    },
     { href: "/compounder/appointments", label: "Book Walk-In", icon: Search },
-    { href: "/compounder/schedule", label: "Doctor Schedule", icon: CalendarDays },
+    {
+      href: "/compounder/schedule",
+      label: "Doctor Schedule",
+      icon: CalendarDays,
+    },
   ],
 };
 
@@ -82,6 +92,12 @@ export default function DashboardShell({
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [globalIncomingCall, setGlobalIncomingCall] = useState<{
+    appointmentId: string;
+    doctorName: string;
+    ringingAt?: string;
+  } | null>(null);
+  const lastIncomingAttemptRef = useRef<string | null>(null);
   const navItems = NAV_CONFIG[role];
   const isNarrow = sidebarWidth === "narrow";
   const sidebarWidthClass = isNarrow ? "lg:w-[72px]" : "lg:w-64";
@@ -99,6 +115,116 @@ export default function DashboardShell({
   }, [sidebarOpen]);
 
   useEffect(() => {
+    if (role !== "patient") return;
+    let active = true;
+    let patientSocket: Socket | undefined;
+    let syncTimer: number | undefined;
+    let incomingExpiryTimer: number | undefined;
+    const handleCallAccepted = () => {
+      if (incomingExpiryTimer !== undefined) {
+        window.clearTimeout(incomingExpiryTimer);
+        incomingExpiryTimer = undefined;
+      }
+    };
+    window.addEventListener(
+      "medibook:video-call-accepted",
+      handleCallAccepted,
+    );
+
+    void getToken().then((token) => {
+      if (!active || !token) return;
+      patientSocket = io(
+        `${process.env.NEXT_PUBLIC_SERVER_URL || ""}/video-calls`,
+        {
+          auth: { token: token.replace(/"/g, "").trim() },
+          reconnection: true,
+          reconnectionAttempts: Infinity,
+          reconnectionDelay: 500,
+          reconnectionDelayMax: 5_000,
+          transports: ["websocket", "polling"],
+          tryAllTransports: true,
+        },
+      );
+      const syncIncomingCalls = () =>
+        patientSocket?.emit("sync-incoming-calls");
+      patientSocket.on("connect", syncIncomingCalls);
+      syncTimer = window.setInterval(() => {
+        if (patientSocket?.connected) syncIncomingCalls();
+      }, 5_000);
+      patientSocket.on("incoming-call", (payload) => {
+        if (!payload?.appointmentId) return;
+        const attemptKey = `${payload.appointmentId}:${payload.ringingAt || ""}`;
+        if (lastIncomingAttemptRef.current === attemptKey) return;
+        lastIncomingAttemptRef.current = attemptKey;
+        const incomingEvent = new CustomEvent("medibook:incoming-video-call", {
+          detail: payload,
+          cancelable: true,
+        });
+        const handledByAppointment = !window.dispatchEvent(incomingEvent);
+        if (!handledByAppointment) {
+          setGlobalIncomingCall({
+            appointmentId: payload.appointmentId,
+            doctorName: payload.doctorName || "Your doctor",
+            ringingAt: payload.ringingAt,
+          });
+        }
+        if (incomingExpiryTimer !== undefined) {
+          window.clearTimeout(incomingExpiryTimer);
+        }
+        const ringingStartedAt = new Date(
+          payload.ringingAt || Date.now(),
+        ).getTime();
+        incomingExpiryTimer = window.setTimeout(
+          () => {
+            lastIncomingAttemptRef.current = null;
+            setGlobalIncomingCall((current) =>
+              current?.appointmentId === payload.appointmentId ? null : current,
+            );
+          },
+          Math.max(0, ringingStartedAt + 45_000 - Date.now()),
+        );
+        if (
+          typeof Notification !== "undefined" &&
+          Notification.permission === "granted"
+        ) {
+          new Notification(
+            `Incoming call from ${payload.doctorName || "your doctor"}`,
+            {
+              body: "Open MediBook to accept your video consultation.",
+              tag: `video-call-${payload.appointmentId}`,
+            },
+          );
+        }
+      });
+      patientSocket.on("call-missed", (payload) => {
+        if (incomingExpiryTimer !== undefined) {
+          window.clearTimeout(incomingExpiryTimer);
+        }
+        lastIncomingAttemptRef.current = null;
+        setGlobalIncomingCall((current) =>
+          !payload?.appointmentId ||
+          current?.appointmentId === payload.appointmentId
+            ? null
+            : current,
+        );
+      });
+    });
+
+    return () => {
+      active = false;
+      if (syncTimer !== undefined) window.clearInterval(syncTimer);
+      if (incomingExpiryTimer !== undefined) {
+        window.clearTimeout(incomingExpiryTimer);
+      }
+      window.removeEventListener(
+        "medibook:video-call-accepted",
+        handleCallAccepted,
+      );
+      patientSocket?.disconnect();
+    };
+  }, [role]);
+
+  useEffect(() => {
     async function verifyRole() {
       try {
         const token = await getToken();
@@ -106,11 +232,18 @@ export default function DashboardShell({
           router.push("/login");
           return;
         }
-        const cleanToken = token.replace(/"/g, '').trim();
+        const cleanToken = token.replace(/"/g, "").trim();
         const decoded = jwtDecode<{ role: string }>(cleanToken);
         if (decoded.role !== role) {
-          console.warn(`Role mismatch: token role is '${decoded.role}', page role is '${role}'`);
-          if (decoded.role === 'patient' || decoded.role === 'doctor' || decoded.role === 'admin' || decoded.role === 'compounder') {
+          console.warn(
+            `Role mismatch: token role is '${decoded.role}', page role is '${role}'`,
+          );
+          if (
+            decoded.role === "patient" ||
+            decoded.role === "doctor" ||
+            decoded.role === "admin" ||
+            decoded.role === "compounder"
+          ) {
             router.push(`/${decoded.role}/dashboard`);
           } else {
             router.push("/login");
@@ -138,9 +271,7 @@ export default function DashboardShell({
   const sidebarContent = (
     <>
       <div
-        className={`flex items-center border-b border-slate-100 shrink-0 ${
-          isNarrow ? "lg:justify-center lg:px-0 px-5 h-[68px]" : "px-5 h-[68px] gap-2.5"
-        }`}
+        className={`flex items-center border-b border-slate-100 shrink-0 ${isNarrow ? "lg:justify-center lg:px-0 px-5 h-[68px]" : "px-5 h-[68px] gap-2.5"}`}
       >
         <Link
           href={ROLE_HOME[role]}
@@ -151,9 +282,7 @@ export default function DashboardShell({
             <Heart className="h-[18px] w-[18px] text-white" />
           </div>
           <span
-            className={`text-lg font-bold tracking-tight text-slate-800 ${
-              isNarrow ? "lg:hidden" : ""
-            }`}
+            className={`text-lg font-bold tracking-tight text-slate-800 ${isNarrow ? "lg:hidden" : ""}`}
           >
             MediBook
           </span>
@@ -177,9 +306,7 @@ export default function DashboardShell({
               key={item.href}
               href={item.href}
               title={item.label}
-              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
-                isNarrow ? "lg:justify-center lg:px-2.5" : ""
-              } ${
+              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ${isNarrow ? "lg:justify-center lg:px-2.5" : ""} ${
                 active
                   ? "bg-[#16BCC8]/10 text-[#16BCC8]"
                   : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
@@ -195,16 +322,17 @@ export default function DashboardShell({
 
       {showHealthTip && (
         <div
-          className={`mx-3 mb-3 p-4 rounded-2xl bg-gradient-to-br from-[#16BCC8]/10 to-[#0ea5a9]/5 border border-[#16BCC8]/15 ${
-            isNarrow ? "lg:hidden" : ""
-          }`}
+          className={`mx-3 mb-3 p-4 rounded-2xl bg-gradient-to-br from-[#16BCC8]/10 to-[#0ea5a9]/5 border border-[#16BCC8]/15 ${isNarrow ? "lg:hidden" : ""}`}
         >
           <div className="flex items-center gap-2 text-[#16BCC8] mb-2">
             <Sparkles size={16} />
-            <span className="text-xs font-bold uppercase tracking-wide">Health tip</span>
+            <span className="text-xs font-bold uppercase tracking-wide">
+              Health tip
+            </span>
           </div>
           <p className="text-xs text-slate-600 leading-relaxed">
-            Drink water regularly and take short breaks during long screen sessions.
+            Drink water regularly and take short breaks during long screen
+            sessions.
           </p>
         </div>
       )}
@@ -229,7 +357,7 @@ export default function DashboardShell({
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
+    <div className="flex min-h-screen w-full max-w-full overflow-x-hidden bg-slate-50">
       {sidebarOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm lg:hidden"
@@ -264,7 +392,19 @@ export default function DashboardShell({
           </Link>
         </div>
 
-        <main className="flex-1 flex flex-col min-h-0">{children}</main>
+        <main className="flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-x-hidden">
+          {children}
+        </main>
+        {globalIncomingCall && (
+          <VideoConsultationRoom
+            appointmentId={globalIncomingCall.appointmentId}
+            role="patient"
+            otherPartyName={globalIncomingCall.doctorName}
+            consultationMethod="platform"
+            ringingAt={globalIncomingCall.ringingAt}
+            compact
+          />
+        )}
       </div>
     </div>
   );

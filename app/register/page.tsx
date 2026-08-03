@@ -1,28 +1,27 @@
-"use client";
-import { Button } from "@/components/UI/button";
-import { Input } from "@/components/UI/input";
-import { Label } from "@/components/UI/label";
-import { Heart, Mail, Lock, User, ArrowRight, Stethoscope, UserRound, Eye, EyeOff } from "lucide-react";
-import Link from "next/link";
-import { useState } from "react";
-import { registerAction } from "../actions/auth";
-
+'use client';
+import { Button } from '@/components/UI/button';
+import { Input } from '@/components/UI/input';
+import { Label } from '@/components/UI/label';
+import { Heart, Mail, Lock, User, ArrowRight, Stethoscope, UserRound, Eye, EyeOff } from 'lucide-react';
+import Link from 'next/link';
+import { useState } from 'react';
+import { registerAction } from '../actions/auth';
 
 const Register = () => {
   // 1. Centralized state for all form inputs
   const [formData, setFormData] = useState({
-    firstName: "",
-    email: "",
-    password: "",
+    firstName: '',
+    email: '',
+    password: '',
     age: 0,
-    role: "patient", // Default value matching your "defaultChecked"
+    role: 'patient', // Default value matching your "defaultChecked"
   });
 
-  const [animate,setAnimate] = useState(false);
+  const [animate, setAnimate] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   // 2. Generic handler for text inputs
-  const handleChange = (e : React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
     setFormData((prev) => ({
       ...prev,
@@ -31,36 +30,34 @@ const Register = () => {
   };
 
   // 3. Specific handler for radio buttons (Role)
-  const handleRoleChange = (roleValue : string) => {
+  const handleRoleChange = (roleValue: string) => {
     setFormData((prev) => ({ ...prev, role: roleValue }));
   };
 
   // 4. Handle Form Submission
-  const handleSubmit = async (e : React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    console.log("Form Submitted:", formData);
+    console.log('Form Submitted:', formData);
     try {
       const data = new FormData();
-      data.append("firstName", formData.firstName);
-      data.append("age", formData.age.toString());
-      data.append("email", formData.email);
-      data.append("password", formData.password);
-      data.append("role", formData.role);
+      data.append('firstName', formData.firstName);
+      data.append('age', formData.age.toString());
+      data.append('email', formData.email);
+      data.append('password', formData.password);
+      data.append('role', formData.role);
 
-    // Call the server action
-    setAnimate(true);
-    await registerAction(data);     
-    setAnimate(false);
-      
+      // Call the server action
+      setAnimate(true);
+      await registerAction(data);
+      setAnimate(false);
     } catch (error) {
-      console.log("register error :", error);      
+      console.log('register error :', error);
     }
-
   };
 
   const roles = [
-    { value: "patient", label: "Patient", icon: UserRound, desc: "Book appointments" },
-    { value: "doctor", label: "Doctor", icon: Stethoscope, desc: "Manage practice" },
+    { value: 'patient', label: 'Patient', icon: UserRound, desc: 'Book appointments' },
+    { value: 'doctor', label: 'Doctor', icon: Stethoscope, desc: 'Manage practice' },
   ];
 
   return (
@@ -79,21 +76,17 @@ const Register = () => {
             <div className="mx-auto mb-8 flex h-20 w-20 items-center justify-center rounded-3xl bg-white/15 backdrop-blur-sm shadow-[0_0_0_1px_rgba(255,255,255,0.2)]">
               <Heart className="h-10 w-10 text-white" />
             </div>
-            <h2 className="text-3xl font-extrabold text-white leading-tight">
-              Join Our Healthcare Community
-            </h2>
+            <h2 className="text-3xl font-extrabold text-white leading-tight">Join Our Healthcare Community</h2>
             <p className="mt-4 text-white/70 leading-relaxed">
-              Whether you&apos;re a patient seeking care or a doctor looking to
-              expand your practice, MediBook connects you with the healthcare
-              you need.
+              Whether you&apos;re a patient seeking care or a doctor looking to expand your practice, MediBook connects you with the healthcare you need.
             </p>
 
             {/* Stats */}
-            <div className="mt-10 grid grid-cols-3 gap-4">
+            <div className="mt-10 grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
               {[
-                { value: "500+", label: "Doctors" },
-                { value: "50K+", label: "Patients" },
-                { value: "4.9★", label: "Rating" },
+                { value: '500+', label: 'Doctors' },
+                { value: '50K+', label: 'Patients' },
+                { value: '4.9★', label: 'Rating' },
               ].map(({ value, label }) => (
                 <div key={label} className="rounded-2xl bg-white/10 backdrop-blur-sm p-4 border border-white/10">
                   <p className="text-2xl font-extrabold text-white">{value}</p>
@@ -112,55 +105,34 @@ const Register = () => {
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#16BCC8] to-[#0ea5a9] shadow-[0_2px_8px_rgba(22,188,200,0.3)] transition-transform duration-300 group-hover:scale-105">
               <Heart className="h-[18px] w-[18px] text-white" />
             </div>
-            <span className="text-xl font-bold tracking-tight text-slate-800">
-              MediBook
-            </span>
+            <span className="text-xl font-bold tracking-tight text-slate-800">MediBook</span>
           </Link>
 
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
-            Create an account
-          </h1>
-          <p className="mt-2 text-slate-500">
-            Start your journey to better healthcare today
-          </p>
+          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Create an account</h1>
+          <p className="mt-2 text-slate-500">Start your journey to better healthcare today</p>
 
           <form onSubmit={handleSubmit} className="mt-8 space-y-5">
             {/* Role Selection */}
             <div className="space-y-3">
-              <label className="text-sm font-medium text-slate-700">
-                I want to join as
-              </label>
+              <label className="text-sm font-medium text-slate-700">I want to join as</label>
 
               <div className="grid grid-cols-2 gap-3">
                 {roles.map(({ value, label, icon: Icon, desc }) => (
                   <label
                     key={value}
                     className={`relative flex flex-col items-center gap-2 cursor-pointer rounded-2xl border-2 p-4 transition-all duration-200 text-center ${
-                      formData.role === value
-                        ? "border-[#16BCC8] bg-[#16BCC8]/5 shadow-[0_0_0_1px_rgba(22,188,200,0.2)]"
-                        : "border-slate-100 hover:border-slate-200 hover:bg-slate-50"
+                      formData.role === value ? 'border-[#16BCC8] bg-[#16BCC8]/5 shadow-[0_0_0_1px_rgba(22,188,200,0.2)]' : 'border-slate-100 hover:border-slate-200 hover:bg-slate-50'
                     }`}
                   >
-                    <input
-                      type="radio"
-                      name="role"
-                      value={value}
-                      checked={formData.role === value}
-                      onChange={() => handleRoleChange(value)}
-                      className="sr-only"
-                    />
-                    <div className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all duration-200 ${
-                      formData.role === value
-                        ? "bg-[#16BCC8]/10 text-[#16BCC8]"
-                        : "bg-slate-100 text-slate-400"
-                    }`}>
+                    <input type="radio" name="role" value={value} checked={formData.role === value} onChange={() => handleRoleChange(value)} className="sr-only" />
+                    <div
+                      className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all duration-200 ${
+                        formData.role === value ? 'bg-[#16BCC8]/10 text-[#16BCC8]' : 'bg-slate-100 text-slate-400'
+                      }`}
+                    >
                       <Icon className="h-5 w-5" />
                     </div>
-                    <span className={`text-sm font-semibold transition-colors ${
-                      formData.role === value ? "text-[#16BCC8]" : "text-slate-700"
-                    }`}>
-                      {label}
-                    </span>
+                    <span className={`text-sm font-semibold transition-colors ${formData.role === value ? 'text-[#16BCC8]' : 'text-slate-700'}`}>{label}</span>
                     <span className="text-[10px] text-slate-400 leading-tight">{desc}</span>
                     {/* Check indicator */}
                     {formData.role === value && (
@@ -177,7 +149,9 @@ const Register = () => {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="firstName" className="text-slate-700 font-medium text-sm">First name</Label>
+                <Label htmlFor="firstName" className="text-slate-700 font-medium text-sm">
+                  First name
+                </Label>
                 <div className="relative">
                   <User className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-300" />
                   <Input
@@ -190,7 +164,9 @@ const Register = () => {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="age" className="text-slate-700 font-medium text-sm">Age</Label>
+                <Label htmlFor="age" className="text-slate-700 font-medium text-sm">
+                  Age
+                </Label>
                 <Input
                   id="age"
                   placeholder="18"
@@ -203,7 +179,9 @@ const Register = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-slate-700 font-medium text-sm">Email address</Label>
+              <Label htmlFor="email" className="text-slate-700 font-medium text-sm">
+                Email address
+              </Label>
               <div className="relative">
                 <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-300" />
                 <Input
@@ -218,33 +196,24 @@ const Register = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-slate-700 font-medium text-sm">Password</Label>
+              <Label htmlFor="password" className="text-slate-700 font-medium text-sm">
+                Password
+              </Label>
               <div className="relative">
                 <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-300" />
                 <Input
                   id="password"
-                  type={showPassword ? "text" : "password"}
+                  type={showPassword ? 'text' : 'password'}
                   placeholder="••••••••"
                   className="pl-11 pr-10 h-12 rounded-xl border-slate-200 bg-slate-50/50 focus:bg-white focus:border-[#16BCC8] transition-all duration-200"
                   value={formData.password}
                   onChange={handleChange}
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
-                >
-                  {showPassword ? (
-                    <EyeOff size={16} />
-                  ) : (
-                    <Eye size={16} />
-                  )}
+                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none">
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Must be at least 8 characters with a number and special
-                character
-              </p>
+              <p className="text-xs text-slate-400 leading-relaxed">Must be at least 8 characters with a number and special character</p>
             </div>
 
             <Button
@@ -268,11 +237,11 @@ const Register = () => {
             </Button>
 
             <p className="text-center text-xs text-slate-400 leading-relaxed">
-              By creating an account, you agree to our{" "}
+              By creating an account, you agree to our{' '}
               <Link href="#" className="text-[#16BCC8] hover:text-[#0ea5a9] font-medium transition-colors">
                 Terms of Service
-              </Link>{" "}
-              and{" "}
+              </Link>{' '}
+              and{' '}
               <Link href="#" className="text-[#16BCC8] hover:text-[#0ea5a9] font-medium transition-colors">
                 Privacy Policy
               </Link>
@@ -280,11 +249,8 @@ const Register = () => {
           </form>
 
           <p className="mt-8 text-center text-sm text-slate-400">
-            Already have an account?{" "}
-            <Link
-              href="/login"
-              className="font-semibold text-[#16BCC8] hover:text-[#0ea5a9] transition-colors duration-200"
-            >
+            Already have an account?{' '}
+            <Link href="/login" className="font-semibold text-[#16BCC8] hover:text-[#0ea5a9] transition-colors duration-200">
               Sign in
             </Link>
           </p>
