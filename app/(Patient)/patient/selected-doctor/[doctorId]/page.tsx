@@ -39,6 +39,23 @@ function getNextSevenDays(): DayOption[] {
   });
 }
 
+// Generate 24/7 time slots every 30 minutes
+function generate24HourSlots(): TimeSlot[] {
+  const slots: TimeSlot[] = [];
+  for (let hour = 0; hour < 24; hour++) {
+    for (let min = 0; min < 60; min += 30) {
+      const period = hour < 12 ? 'AM' : 'PM';
+      const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+      const displayMin = min === 0 ? '00' : min;
+      slots.push({
+        time: `${displayHour}:${displayMin} ${period}`,
+        period: hour < 12 ? 'Morning' : hour < 17 ? 'Afternoon' : 'Evening'
+      });
+    }
+  }
+  return slots;
+}
+
 function parseSlotToDateTime(dateObj: Date, timeStr: string): Date {
   const clone = new Date(dateObj);
   const [timePart, period] = timeStr.split(' ');
@@ -62,23 +79,23 @@ const StepIndicator = ({ step }: { step: BookingStep }) => {
   ];
   const current = steps.findIndex(s => s.key === step);
   return (
-    <div className="flex items-center justify-between mb-6 px-1">
+    <div className="flex items-center justify-between mb-4 sm:mb-6 px-1">
       {steps.map((s, idx) => (
         <React.Fragment key={s.key}>
           <div className="flex flex-col items-center gap-1">
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+            <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
               idx < current ? 'bg-teal-600 text-white' :
-              idx === current ? 'bg-teal-600 text-white ring-4 ring-teal-100' :
+              idx === current ? 'bg-teal-600 text-white ring-3 sm:ring-4 ring-teal-100' :
               'bg-slate-100 text-slate-400'
             }`}>
               {idx < current ? <Check size={14} /> : idx + 1}
             </div>
-            <span className={`text-[10px] font-medium ${idx <= current ? 'text-teal-700' : 'text-slate-400'}`}>
+            <span className={`text-[9px] sm:text-[10px] font-medium ${idx <= current ? 'text-teal-700' : 'text-slate-400'}`}>
               {s.label}
             </span>
           </div>
           {idx < steps.length - 1 && (
-            <div className={`flex-1 h-0.5 mx-2 mb-4 rounded transition-all ${idx < current ? 'bg-teal-500' : 'bg-slate-200'}`} />
+            <div className={`flex-1 h-0.5 mx-1 sm:mx-2 mb-3 sm:mb-4 rounded transition-all ${idx < current ? 'bg-teal-500' : 'bg-slate-200'}`} />
           )}
         </React.Fragment>
       ))}
@@ -95,7 +112,7 @@ const SlotGroup = ({
   return (
     <div className="mb-4">
       <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{title}</p>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
         {slots.map((slot, i) => {
           const isBooked = bookedTimes.includes(slot.time);
           return (
@@ -104,7 +121,7 @@ const SlotGroup = ({
               type="button"
               disabled={isBooked}
               onClick={() => onSelect(slot.time)}
-              className={`text-xs font-semibold py-2 rounded-lg border transition-all ${
+              className={`text-xs sm:text-sm font-semibold py-2.5 sm:py-3 rounded-lg border transition-all ${
                 isBooked
                   ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60 line-through'
                   : selected === slot.time
@@ -167,13 +184,12 @@ export default function DoctorProfile() {
           headers['Authorization'] = `Bearer ${cleanToken}`;
         }
 
-        // 1. Fetch all doctors and find matching doctor
-        const response = await axios.get(`${serverUrl}/patient/allDoctors`, { headers });
-        const matchingDoc = response.data.find((d: any) => d._id === doctorId);
-        setDoctor(matchingDoc);
+        // 1. Fetch specific doctor by ID
+        const response = await axios.get(`${serverUrl}/patient/doctor/${doctorId}`, { headers });
+        setDoctor(response.data);
 
         // 2. Fetch booked appointments if logged in
-        if (cleanToken && matchingDoc) {
+        if (cleanToken && response.data) {
           const bookedRes = await axios.get(`${serverUrl}/patient/doctor-appointments/${doctorId}`, {
             headers: { Authorization: `Bearer ${cleanToken}` }
           });
@@ -236,53 +252,15 @@ export default function DoctorProfile() {
       });
   }, [bookedAppointments, selectedDayIdx, days]);
 
-  // Dynamically build today's slots based on the doctor's availability list
+  // Use 24/7 time slots every 30 minutes
   const timeSlotsForSelectedDay = useMemo(() => {
-    if (!doctor || !doctor.availability) return [];
-    const selectedDayName = days[selectedDayIdx].fullDayName;
-    const slotsForDay = doctor.availability.filter(
-      (slot: any) => slot.day === selectedDayName && slot.isAvailable
-    );
+    return generate24HourSlots();
+  }, []);
 
-    const format12h = (t24: string) => {
-      const [hStr, mStr] = t24.split(':');
-      let h = parseInt(hStr);
-      const ampm = h >= 12 ? 'PM' : 'AM';
-      h = h % 12;
-      h = h ? h : 12;
-      return `${String(h).padStart(2, '0')}:${mStr} ${ampm}`;
-    };
-
-    const toMin = (t: string) => {
-      const [h, m] = t.split(':').map(Number);
-      return h * 60 + m;
-    };
-
-    const sorted = [...slotsForDay].sort((a, b) => toMin(a.startTime) - toMin(b.startTime));
-
-    return sorted.map((s: any) => {
-      const time12 = format12h(s.startTime);
-      const [hStr] = s.startTime.split(':');
-      const hour = parseInt(hStr);
-      
-      let period: TimePeriod = 'Morning';
-      if (hour >= 12 && hour < 17) {
-        period = 'Afternoon';
-      } else if (hour >= 17) {
-        period = 'Evening';
-      }
-
-      return {
-        time: time12,
-        period,
-      };
-    });
-  }, [doctor, selectedDayIdx, days]);
-
-  // ── Slot groups ──
-  const morning = useMemo(() => timeSlotsForSelectedDay.filter(s => s.period === 'Morning'), [timeSlotsForSelectedDay]);
-  const afternoon = useMemo(() => timeSlotsForSelectedDay.filter(s => s.period === 'Afternoon'), [timeSlotsForSelectedDay]);
-  const evening = useMemo(() => timeSlotsForSelectedDay.filter(s => s.period === 'Evening'), [timeSlotsForSelectedDay]);
+  // ── Slot groups (show first 8 slots per period for better UX) ──
+  const morning = useMemo(() => timeSlotsForSelectedDay.filter(s => s.period === 'Morning').slice(0, 8), [timeSlotsForSelectedDay]);
+  const afternoon = useMemo(() => timeSlotsForSelectedDay.filter(s => s.period === 'Afternoon').slice(0, 8), [timeSlotsForSelectedDay]);
+  const evening = useMemo(() => timeSlotsForSelectedDay.filter(s => s.period === 'Evening').slice(0, 8), [timeSlotsForSelectedDay]);
 
   // ── Handlers ──
   const handleProceedToPayment = () => {
@@ -351,16 +329,16 @@ export default function DoctorProfile() {
   const renderBookingPanel = () => {
     // ── STEP 1: Date & Time ──
     if (step === 'datetime') return (
-      <div className="p-5">
+      <div className="p-3 sm:p-5">
         <StepIndicator step={step} />
 
         {/* Consultation type */}
-        <div className="flex p-1 bg-slate-100 rounded-xl mb-5">
+        <div className="flex p-1 bg-slate-100 rounded-xl mb-4 sm:mb-5">
           {(['Clinic', 'Video'] as BookingType[]).map(type => (
             <button
               key={type}
               onClick={() => setBookingType(type)}
-              className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-lg transition-all ${
+              className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 text-xs sm:text-sm font-bold rounded-lg transition-all ${
                 bookingType === type ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
               }`}
             >
@@ -371,45 +349,45 @@ export default function DoctorProfile() {
         </div>
 
         {/* Fee */}
-        <div className="flex justify-between items-center mb-5 pb-4 border-b border-slate-100">
-          <span className="text-sm text-slate-500 font-medium">Consultation Fee</span>
-          <span className="text-xl font-extrabold text-teal-700">PKR {fee}</span>
+        <div className="flex justify-between items-center mb-4 sm:mb-5 pb-3 sm:pb-4 border-b border-slate-100">
+          <span className="text-xs sm:text-sm text-slate-500 font-medium">Consultation Fee</span>
+          <span className="text-lg sm:text-xl font-extrabold text-teal-700">PKR {fee}</span>
         </div>
 
         {/* Date selector */}
-        <div className="mb-5">
+        <div className="mb-4 sm:mb-5">
           <div className="flex justify-between items-center mb-2">
-            <h4 className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
+            <h4 className="font-bold text-slate-800 text-xs sm:text-sm flex items-center gap-1.5">
               <Calendar size={14} className="text-teal-600" /> Select Date
             </h4>
-            <span className="text-xs text-slate-400 font-medium">Next 7 days</span>
+            <span className="text-[10px] sm:text-xs text-slate-400 font-medium">Next 7 days</span>
           </div>
           <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
             {days.map((d, i) => (
               <button
                 key={i}
                 onClick={() => { setSelectedDayIdx(i); setSelectedTime(null); }}
-                className={`flex flex-col items-center justify-center min-w-[62px] py-2.5 px-1 rounded-xl border-2 transition-all flex-shrink-0 ${
+                className={`flex flex-col items-center justify-center min-w-[52px] sm:min-w-[62px] py-2 sm:py-2.5 px-1 rounded-xl border-2 transition-all flex-shrink-0 ${
                   selectedDayIdx === i
                     ? 'bg-teal-600 border-teal-600 text-white shadow-md'
                     : 'bg-white border-slate-200 text-slate-600 hover:border-teal-300'
                 }`}
               >
-                <span className="text-[10px] font-semibold opacity-75">{d.label}</span>
-                <span className="text-base font-extrabold leading-tight">{d.date.getDate()}</span>
-                <span className="text-[9px] opacity-70">{d.display.split(' ')[1]}</span>
+                <span className="text-[9px] sm:text-[10px] font-semibold opacity-75">{d.label}</span>
+                <span className="text-sm sm:text-base font-extrabold leading-tight">{d.date.getDate()}</span>
+                <span className="text-[8px] sm:text-[9px] opacity-70">{d.display.split(' ')[1]}</span>
               </button>
             ))}
           </div>
         </div>
 
         {/* Time slots */}
-        <div className="mb-5">
-          <h4 className="font-bold text-slate-800 text-sm mb-3 flex items-center gap-1.5">
+        <div className="mb-4 sm:mb-5">
+          <h4 className="font-bold text-slate-800 text-xs sm:text-sm mb-2 sm:mb-3 flex items-center gap-1.5">
             <Clock size={14} className="text-teal-600" /> Available Slots
           </h4>
           {timeSlotsForSelectedDay.length === 0 ? (
-            <div className="text-center py-8 text-slate-400 text-sm bg-slate-50 border border-slate-100/70 rounded-xl italic">
+            <div className="text-center py-6 sm:py-8 text-slate-400 text-xs sm:text-sm bg-slate-50 border border-slate-100/70 rounded-xl italic">
               Doctor has no availability shifts configured for this day.
             </div>
           ) : (
@@ -423,7 +401,7 @@ export default function DoctorProfile() {
 
         {/* Selected summary */}
         {selectedTime && (
-          <div className="mb-4 p-3 bg-teal-50 border border-teal-100 rounded-xl text-sm text-teal-800 flex items-center gap-2">
+          <div className="mb-3 sm:mb-4 p-2.5 sm:p-3 bg-teal-50 border border-teal-100 rounded-xl text-xs sm:text-sm text-teal-800 flex items-center gap-2">
             <CheckCircle2 size={16} className="text-teal-600 shrink-0" />
             <span>
               <span className="font-bold">{days[selectedDayIdx].display}</span> at{' '}
@@ -435,7 +413,7 @@ export default function DoctorProfile() {
         <button
           onClick={handleProceedToPayment}
           disabled={!selectedTime}
-          className={`w-full py-3.5 rounded-xl font-bold text-white transition-all shadow-md ${
+          className={`w-full py-3 sm:py-3.5 rounded-xl font-bold text-white transition-all shadow-md text-sm sm:text-base ${
             selectedTime
               ? 'bg-teal-600 hover:bg-teal-700 hover:shadow-lg'
               : 'bg-slate-300 cursor-not-allowed'
@@ -444,7 +422,7 @@ export default function DoctorProfile() {
           {selectedTime ? 'Proceed to Payment →' : 'Select a Time Slot'}
         </button>
 
-        <p className="text-center text-xs text-slate-400 mt-3 flex items-center justify-center gap-1">
+        <p className="text-center text-[10px] sm:text-xs text-slate-400 mt-2 sm:mt-3 flex items-center justify-center gap-1">
           <Info size={11} /> Usually responds within 1 hour
         </p>
       </div>
@@ -452,16 +430,16 @@ export default function DoctorProfile() {
 
     // ── STEP 2: Payment ──
     if (step === 'payment') return (
-      <div className="p-5">
+      <div className="p-3 sm:p-5">
         <StepIndicator step={step} />
 
         {/* Order summary */}
-        <div className="bg-gradient-to-br from-teal-50 to-cyan-50 border border-teal-100 rounded-2xl p-4 mb-5">
-          <p className="text-xs font-bold text-teal-600 uppercase tracking-wider mb-2">Booking Summary</p>
-          <div className="space-y-1.5 text-sm">
+        <div className="bg-gradient-to-br from-teal-50 to-cyan-50 border border-teal-100 rounded-2xl p-3 sm:p-4 mb-4 sm:mb-5">
+          <p className="text-[10px] sm:text-xs font-bold text-teal-600 uppercase tracking-wider mb-2">Booking Summary</p>
+          <div className="space-y-1.5 text-xs sm:text-sm">
             <div className="flex justify-between">
               <span className="text-slate-500">Doctor</span>
-              <span className="font-semibold text-slate-800">{doctor?.fullName}</span>
+              <span className="font-semibold text-slate-800 truncate ml-2">{doctor?.fullName}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500">Date</span>
@@ -477,16 +455,16 @@ export default function DoctorProfile() {
             </div>
             <div className="border-t border-teal-100 my-2 pt-2 flex justify-between">
               <span className="font-bold text-slate-700">Total</span>
-              <span className="font-extrabold text-teal-700 text-base">PKR {fee}</span>
+              <span className="font-extrabold text-teal-700 text-sm sm:text-base">PKR {fee}</span>
             </div>
           </div>
         </div>
 
         {/* Payment method tabs */}
-        <div className="flex gap-3 mb-4">
+        <div className="flex gap-2 sm:gap-3 mb-3 sm:mb-4">
           <button
             onClick={() => setPaymentMethod('card')}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 text-sm font-bold transition-all ${
+            className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 rounded-xl border-2 text-xs sm:text-sm font-bold transition-all ${
               paymentMethod === 'card'
                 ? 'border-teal-500 bg-teal-50 text-teal-700'
                 : 'border-slate-200 text-slate-500 hover:border-slate-300'
@@ -496,7 +474,7 @@ export default function DoctorProfile() {
           </button>
           <button
             onClick={() => setPaymentMethod('cash')}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 text-sm font-bold transition-all ${
+            className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 rounded-xl border-2 text-xs sm:text-sm font-bold transition-all ${
               paymentMethod === 'cash'
                 ? 'border-teal-500 bg-teal-50 text-teal-700'
                 : 'border-slate-200 text-slate-500 hover:border-slate-300'
@@ -508,43 +486,43 @@ export default function DoctorProfile() {
 
         {/* Card form */}
         {paymentMethod === 'card' && (
-          <div className="space-y-3 mb-5">
+          <div className="space-y-3 mb-4 sm:mb-5">
             <div>
-              <label className="text-xs font-semibold text-slate-500 mb-1 block">Cardholder Name</label>
+              <label className="text-[10px] sm:text-xs font-semibold text-slate-500 mb-1 block">Cardholder Name</label>
               <input
                 value={cardName}
                 onChange={e => setCardName(e.target.value)}
                 placeholder="John Smith"
-                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-50 transition-all"
+                className="w-full px-3 py-2 sm:py-2.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-50 transition-all"
               />
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-500 mb-1 block">Card Number</label>
+              <label className="text-[10px] sm:text-xs font-semibold text-slate-500 mb-1 block">Card Number</label>
               <input
                 value={cardNumber}
                 onChange={e => setCardNumber(formatCard(e.target.value))}
                 placeholder="1234 5678 9012 3456"
-                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm font-mono focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-50 transition-all"
+                className="w-full px-3 py-2 sm:py-2.5 border border-slate-200 rounded-xl text-xs sm:text-sm font-mono focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-50 transition-all"
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-2 sm:gap-3">
               <div>
-                <label className="text-xs font-semibold text-slate-500 mb-1 block">Expiry</label>
+                <label className="text-[10px] sm:text-xs font-semibold text-slate-500 mb-1 block">Expiry</label>
                 <input
                   value={cardExpiry}
                   onChange={e => setCardExpiry(formatExpiry(e.target.value))}
                   placeholder="MM/YY"
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm font-mono focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-50 transition-all"
+                  className="w-full px-3 py-2 sm:py-2.5 border border-slate-200 rounded-xl text-xs sm:text-sm font-mono focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-50 transition-all"
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold text-slate-500 mb-1 block">CVV</label>
+                <label className="text-[10px] sm:text-xs font-semibold text-slate-500 mb-1 block">CVV</label>
                 <input
                   value={cardCVV}
                   onChange={e => setCardCVV(e.target.value.replace(/\D/g, '').slice(0, 3))}
                   placeholder="•••"
                   type="password"
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm font-mono focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-50 transition-all"
+                  className="w-full px-3 py-2 sm:py-2.5 border border-slate-200 rounded-xl text-xs sm:text-sm font-mono focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-50 transition-all"
                 />
               </div>
             </div>
@@ -552,14 +530,14 @@ export default function DoctorProfile() {
         )}
 
         {paymentMethod === 'cash' && (
-          <div className="mb-5 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
+          <div className="mb-4 sm:mb-5 p-3 sm:p-4 bg-amber-50 border border-amber-200 rounded-xl text-xs sm:text-sm text-amber-800">
             <p className="font-semibold mb-1">Pay at the clinic</p>
-            <p className="text-amber-700 text-xs">Please arrive 10 minutes early and bring <strong>PKR {fee}</strong> in cash.</p>
+            <p className="text-amber-700 text-[10px] sm:text-xs">Please arrive 10 minutes early and bring <strong>PKR {fee}</strong> in cash.</p>
           </div>
         )}
 
         {errorMessage && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+          <div className="mb-3 sm:mb-4 p-2.5 sm:p-3 bg-red-50 border border-red-200 rounded-xl text-xs sm:text-sm text-red-700">
             {errorMessage}
           </div>
         )}
@@ -567,14 +545,14 @@ export default function DoctorProfile() {
         <button
           onClick={handleConfirmAppointment}
           disabled={isSubmitting || (paymentMethod === 'card' && (!cardName || cardNumber.length < 19 || cardExpiry.length < 5 || cardCVV.length < 3))}
-          className="w-full py-3.5 rounded-xl font-bold text-white bg-teal-600 hover:bg-teal-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-all shadow-md flex items-center justify-center gap-2"
+          className="w-full py-3 sm:py-3.5 rounded-xl font-bold text-white bg-teal-600 hover:bg-teal-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-all shadow-md flex items-center justify-center gap-2 text-sm sm:text-base"
         >
           {isSubmitting ? <><Loader2 size={18} className="animate-spin" /> Processing…</> : `Confirm & Pay PKR ${fee}`}
         </button>
 
         <button
           onClick={() => setStep('datetime')}
-          className="w-full mt-2 py-2.5 rounded-xl font-semibold text-slate-500 hover:bg-slate-100 transition-all flex items-center justify-center gap-1.5 text-sm"
+          className="w-full mt-2 py-2 sm:py-2.5 rounded-xl font-semibold text-slate-500 hover:bg-slate-100 transition-all flex items-center justify-center gap-1.5 text-xs sm:text-sm"
         >
           <ArrowLeft size={14} /> Back
         </button>
@@ -583,31 +561,31 @@ export default function DoctorProfile() {
 
     // ── STEP 3: Confirmed ──
     if (step === 'confirmed') return (
-      <div className="p-6 text-center">
-        <div className="w-20 h-20 bg-teal-50 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-teal-100">
+      <div className="p-4 sm:p-6 text-center">
+        <div className="w-16 h-16 sm:w-20 sm:h-20 bg-teal-50 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4 border-4 border-teal-100">
           <Check size={36} className="text-teal-600" strokeWidth={3} />
         </div>
-        <h3 className="text-xl font-extrabold text-slate-800 mb-1">You're Booked! 🎉</h3>
-        <p className="text-slate-500 text-sm mb-5">Your appointment has been confirmed.</p>
+        <h3 className="text-lg sm:text-xl font-extrabold text-slate-800 mb-1">You're Booked! 🎉</h3>
+        <p className="text-slate-500 text-xs sm:text-sm mb-4 sm:mb-5">Your appointment has been confirmed.</p>
 
-        <div className="bg-teal-50 border border-teal-100 rounded-2xl p-4 mb-6 text-left space-y-2 text-sm">
-          <div className="flex items-center gap-3">
+        <div className="bg-teal-50 border border-teal-100 rounded-2xl p-3 sm:p-4 mb-4 sm:mb-6 text-left space-y-2 text-xs sm:text-sm">
+          <div className="flex items-center gap-2 sm:gap-3">
             <User size={15} className="text-teal-600 shrink-0" />
             <span className="text-slate-700"><span className="font-semibold">Doctor:</span> {doctor?.fullName}</span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <Calendar size={15} className="text-teal-600 shrink-0" />
             <span className="text-slate-700">
               <span className="font-semibold">Date:</span> {days[selectedDayIdx].display} at {selectedTime}
             </span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             {bookingType === 'Clinic' ? <MapPin size={15} className="text-teal-600 shrink-0" /> : <Video size={15} className="text-teal-600 shrink-0" />}
             <span className="text-slate-700">
               <span className="font-semibold">Type:</span> {bookingType === 'Clinic' ? 'In-Clinic Visit' : 'Video Consultation'}
             </span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <CreditCard size={15} className="text-teal-600 shrink-0" />
             <span className="text-slate-700">
               <span className="font-semibold">Payment:</span> PKR {fee} · {paymentMethod === 'card' ? 'Card' : 'Pay at Clinic'}
@@ -617,7 +595,7 @@ export default function DoctorProfile() {
 
         <button
           onClick={handleReset}
-          className="w-full py-3 rounded-xl font-bold text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 transition-all text-sm"
+          className="w-full py-2.5 sm:py-3 rounded-xl font-bold text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 transition-all text-xs sm:text-sm"
         >
           Book Another Appointment
         </button>
@@ -689,14 +667,14 @@ export default function DoctorProfile() {
         </div>
       </nav>
 
-      <main className="max-w-6xl mx-auto px-4 pt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <main className="max-w-6xl mx-auto px-4 pt-6 sm:pt-8 grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
 
         {/* ── LEFT: Doctor Info ── */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-4 sm:space-y-6">
 
           {/* Header Card */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 relative overflow-hidden">
-            <div className="absolute top-4 right-4 flex gap-2">
+          <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100 relative overflow-hidden">
+            <div className="absolute top-3 sm:top-4 right-3 sm:right-4 flex gap-2">
               <button className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-full transition-colors">
                 <Share2 size={18} />
               </button>
@@ -708,30 +686,30 @@ export default function DoctorProfile() {
               </button>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-6">
-              <div className="relative self-start shrink-0">
+            <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
+              <div className="relative self-start shrink-0 mx-auto sm:mx-0">
                 <img
                   src={doctor.profilePictureUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.fullName)}&background=0D9488&color=fff`}
                   alt=""
-                  className="w-28 h-28 rounded-2xl object-cover border border-slate-100 shadow"
+                  className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl object-cover border border-slate-100 shadow"
                 />
                 <span className="absolute -bottom-2 -right-2 bg-white p-0.5 rounded-full">
                   <span className="block w-4 h-4 bg-green-500 rounded-full border-2 border-white" title="Online" />
                 </span>
               </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <h1 className="text-2xl font-extrabold text-slate-900">{doctor.fullName}</h1>
+              <div className="flex-1 text-center sm:text-left">
+                <div className="flex items-center justify-center sm:justify-start gap-2 mb-0.5">
+                  <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900">{doctor.fullName}</h1>
                   <ShieldCheck className="text-teal-500" size={20} />
                 </div>
-                <p className="text-slate-500 font-medium mb-3">{doctor.specialization} · {doctor.clinicName || 'Clinic Desk'}</p>
-                <div className="flex flex-wrap gap-3">
-                  <div className="flex items-center gap-1.5 text-sm text-slate-600 bg-slate-50 px-3 py-1.5 rounded-lg">
+                <p className="text-slate-500 font-medium mb-2 sm:mb-3 text-sm sm:text-base">{doctor.specialization} · {doctor.clinicName || 'Clinic Desk'}</p>
+                <div className="flex flex-wrap justify-center sm:justify-start gap-2 sm:gap-3">
+                  <div className="flex items-center gap-1.5 text-xs sm:text-sm text-slate-600 bg-slate-50 px-2.5 sm:px-3 py-1.5 rounded-lg">
                     <Star size={15} className="text-yellow-500 fill-yellow-500" />
                     <span className="font-bold">{doctor.rating ?? 0}</span>
                     <span className="text-slate-400">({doctor.reviewCount ?? 0})</span>
                   </div>
-                  <div className="flex items-center gap-1.5 text-sm text-slate-600 bg-slate-50 px-3 py-1.5 rounded-lg">
+                  <div className="flex items-center gap-1.5 text-xs sm:text-sm text-slate-600 bg-slate-50 px-2.5 sm:px-3 py-1.5 rounded-lg">
                     <BriefcaseIcon className="text-teal-600" />
                     <span>{doctor.experienceYears || 1} Years Exp.</span>
                   </div>
@@ -741,12 +719,12 @@ export default function DoctorProfile() {
           </div>
 
           {/* About */}
-          <section className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+          <section className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100">
             <SectionTitle title="About Doctor" />
-            <p className="text-slate-600 leading-relaxed text-sm mb-6">{doctor.Bio || `Dr. ${doctor.fullName} is a dedicated ${doctor.specialization} specialist committed to providing exceptional, patient-centered healthcare. Specializes in custom treatment plans and advanced clinical care.`}</p>
-            <div className="grid md:grid-cols-2 gap-6">
+            <p className="text-slate-600 leading-relaxed text-sm mb-4 sm:mb-6">{doctor.Bio || `Dr. ${doctor.fullName} is a dedicated ${doctor.specialization} specialist committed to providing exceptional, patient-centered healthcare. Specializes in custom treatment plans and advanced clinical care.`}</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
               <div>
-                <h3 className="font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                <h3 className="font-semibold text-slate-800 mb-2 sm:mb-3 flex items-center gap-2 text-sm sm:text-base">
                   <GraduationCap size={18} className="text-teal-600" /> Professional Details
                 </h3>
                 <ul className="space-y-2">
@@ -761,16 +739,16 @@ export default function DoctorProfile() {
                 </ul>
               </div>
               <div>
-                <h3 className="font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                <h3 className="font-semibold text-slate-800 mb-2 sm:mb-3 flex items-center gap-2 text-sm sm:text-base">
                   <Languages size={18} className="text-teal-600" /> Languages Spoken
                 </h3>
                 <div className="flex flex-wrap gap-2">
                   {doctor.language && doctor.language.length > 0 ? (
                     doctor.language.map((lang: string, idx: number) => (
-                      <span key={idx} className="px-3 py-1 bg-slate-100 text-slate-600 text-sm rounded-lg">{lang}</span>
+                      <span key={idx} className="px-2.5 sm:px-3 py-1 bg-slate-100 text-slate-600 text-xs sm:text-sm rounded-lg">{lang}</span>
                     ))
                   ) : (
-                    <span className="px-3 py-1 bg-slate-100 text-slate-600 text-sm rounded-lg">English</span>
+                    <span className="px-2.5 sm:px-3 py-1 bg-slate-100 text-slate-600 text-xs sm:text-sm rounded-lg">English</span>
                   )}
                 </div>
               </div>
@@ -778,48 +756,48 @@ export default function DoctorProfile() {
           </section>
 
           {/* Services */}
-          <section className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+          <section className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100">
             <SectionTitle title="Specializations & Services" />
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3">
               {services.map((service: string, idx: number) => (
-                <div key={idx} className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 hover:border-teal-200 hover:bg-teal-50/50 transition-colors group">
-                  <div className="p-2 bg-teal-50 text-teal-600 rounded-lg group-hover:bg-teal-100 transition-colors">
+                <div key={idx} className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-xl border border-slate-100 hover:border-teal-200 hover:bg-teal-50/50 transition-colors group">
+                  <div className="p-1.5 sm:p-2 bg-teal-50 text-teal-600 rounded-lg group-hover:bg-teal-100 transition-colors shrink-0">
                     <Stethoscope size={16} />
                   </div>
-                  <span className="text-sm font-medium text-slate-700">{service}</span>
+                  <span className="text-xs sm:text-sm font-medium text-slate-700">{service}</span>
                 </div>
               ))}
             </div>
           </section>
 
           {/* Clinic Info */}
-          <section className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+          <section className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100">
             <SectionTitle title="Clinic Location" />
-            <div className="flex flex-col md:flex-row gap-6">
-              <div className="flex-1 space-y-4">
-                <div className="flex items-start gap-3">
+            <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
+              <div className="flex-1 space-y-3 sm:space-y-4">
+                <div className="flex items-start gap-2 sm:gap-3">
                   <MapPin className="text-teal-600 mt-1 shrink-0" size={20} />
                   <div>
-                    <h4 className="font-bold text-slate-800">{doctor.clinicName || 'Clinic Desk'}</h4>
-                    <p className="text-sm text-slate-500 mt-1">{doctor.clinicAddress || 'Hospital Address'}{doctor.city ? `, ${doctor.city}` : ''}{doctor.province ? `, ${doctor.province}` : ''}</p>
+                    <h4 className="font-bold text-slate-800 text-sm sm:text-base">{doctor.clinicName || 'Clinic Desk'}</h4>
+                    <p className="text-xs sm:text-sm text-slate-500 mt-1">{doctor.clinicAddress || 'Hospital Address'}{doctor.city ? `, ${doctor.city}` : ''}{doctor.province ? `, ${doctor.province}` : ''}</p>
                   </div>
                 </div>
-                <div className="flex items-start gap-3">
+                <div className="flex items-start gap-2 sm:gap-3">
                   <Clock className="text-teal-600 mt-1 shrink-0" size={20} />
                   <div>
-                    <h4 className="font-bold text-slate-800">Clinic Status</h4>
-                    <p className="text-sm text-slate-500 mt-1">Available for Walk-Ins & Online Consultations</p>
+                    <h4 className="font-bold text-slate-800 text-sm sm:text-base">Working Hours</h4>
+                    <p className="text-xs sm:text-sm text-slate-500 mt-1">24/7 Available</p>
                   </div>
                 </div>
               </div>
-              <div className="w-full md:w-80 overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
+              <div className="w-full sm:w-80 md:w-96 overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
                 {doctor.clinicLatitude != null && doctor.clinicLongitude != null ? (
                   <>
-                    <iframe title={`${doctor.clinicName || 'Clinic'} location`} src={`https://www.google.com/maps?q=${doctor.clinicLatitude},${doctor.clinicLongitude}&z=16&output=embed`} className="h-44 w-full" loading="lazy" referrerPolicy="no-referrer-when-downgrade" />
+                    <iframe title={`${doctor.clinicName || 'Clinic'} location`} src={`https://www.google.com/maps?q=${doctor.clinicLatitude},${doctor.clinicLongitude}&z=16&output=embed`} className="h-36 sm:h-44 w-full" loading="lazy" referrerPolicy="no-referrer-when-downgrade" />
                     <a href={`https://www.google.com/maps/search/?api=1&query=${doctor.clinicLatitude},${doctor.clinicLongitude}`} target="_blank" rel="noreferrer" className="block bg-white px-3 py-2 text-center text-xs font-bold text-teal-700">Open in Google Maps</a>
                   </>
                 ) : (
-                  <div className="flex h-40 items-center justify-center text-slate-400"><span className="flex items-center gap-2"><MapPin size={16} /> Location not added</span></div>
+                  <div className="flex h-36 sm:h-40 items-center justify-center text-slate-400"><span className="flex items-center gap-2 text-xs sm:text-sm"><MapPin size={16} /> Location not added</span></div>
                 )}
               </div>
             </div>
@@ -882,11 +860,11 @@ export default function DoctorProfile() {
         </div>
 
         {/* ── RIGHT: Booking Panel ── */}
-        <div className="lg:col-span-1">
-          <div className="sticky top-6 bg-white rounded-2xl shadow-xl border border-teal-100 overflow-hidden">
+        <div className="lg:col-span-1 order-first lg:order-last">
+          <div className="sticky top-4 sm:top-6 bg-white rounded-2xl shadow-xl border border-teal-100 overflow-hidden">
             {/* Panel header */}
-            <div className={`p-4 border-b border-teal-100 ${step === 'confirmed' ? 'bg-teal-600' : 'bg-teal-50'}`}>
-              <h3 className={`font-extrabold text-lg ${step === 'confirmed' ? 'text-white' : 'text-teal-900'}`}>
+            <div className={`p-3 sm:p-4 border-b border-teal-100 ${step === 'confirmed' ? 'bg-teal-600' : 'bg-teal-50'}`}>
+              <h3 className={`font-extrabold text-base sm:text-lg ${step === 'confirmed' ? 'text-white' : 'text-teal-900'}`}>
                 {step === 'datetime' && 'Book Appointment'}
                 {step === 'payment' && 'Complete Payment'}
                 {step === 'confirmed' && '✓ Appointment Confirmed'}

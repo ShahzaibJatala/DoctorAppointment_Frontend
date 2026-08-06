@@ -26,7 +26,7 @@ import DashboardShell from '@/components/layouts/DashboardShell';
 import { getToken } from '@/app/actions/token';
 
 // --- Types ---
-type UserStatus = 'Active' | 'Inactive' | 'Blocked';
+type UserStatus = 'Active' | 'Inactive' | 'Blocked' | 'Suspended';
 
 interface User {
   id: string;
@@ -47,18 +47,20 @@ const StatusBadge = ({ status }: { status: UserStatus }) => {
     Active: 'bg-green-50 text-green-700 border-green-200',
     Inactive: 'bg-slate-100 text-slate-500 border-slate-200',
     Blocked: 'bg-red-50 text-red-700 border-red-200',
+    Suspended: 'bg-orange-50 text-orange-700 border-orange-200',
   };
 
   const icons = {
     Active: CheckCircle,
     Inactive: XCircle,
     Blocked: Lock,
+    Suspended: Lock,
   };
 
   const Icon = icons[status] || CheckCircle;
 
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border ${styles[status]}`}>
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border ${styles[status] || styles.Active}`}>
       <Icon size={12} />
       {status}
     </span>
@@ -80,11 +82,21 @@ const StatsCard = ({ label, value, icon: Icon, trend, color }: { label: string; 
 
 export default function AdminUsers() {
   const [usersData, setUsersData] = useState<User[]>([]);
-  const [activeTab, setActiveTab] = useState<'All' | 'Active' | 'Blocked'>('All');
+  const [activeTab, setActiveTab] = useState<'All' | 'Active' | 'Blocked' | 'Suspended'>('All');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL;
+
+  const getAuthHeader = async () => {
+    const token = await getToken();
+    if (!token) throw new Error('No token');
+    const cleanToken = token.replace(/"/g, '').trim();
+    return { Authorization: `Bearer ${cleanToken}` };
+  };
 
   const fetchUsers = async () => {
     try {
@@ -92,7 +104,6 @@ export default function AdminUsers() {
       const token = await getToken();
       if (!token) return;
       const cleanToken = token.replace(/"/g, '').trim();
-      const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL;
       const res = await fetch(`${serverUrl}/admin/users`, {
         headers: {
           Authorization: `Bearer ${cleanToken}`,
@@ -109,6 +120,25 @@ export default function AdminUsers() {
     }
   };
 
+  const handleSuspendUser = async (user: User) => {
+    setActionLoading(user.id + '-suspend');
+    try {
+      const headers = await getAuthHeader();
+      const res = await fetch(`${serverUrl}/admin/users/${user.id}/suspend`, {
+        method: 'POST',
+        headers,
+      });
+      if (res.ok) {
+        await fetchUsers();
+        if (selectedUser?.id === user.id) setSelectedUser(null);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
   }, []);
@@ -116,7 +146,9 @@ export default function AdminUsers() {
   // Filter Logic
   const filteredUsers = usersData.filter((user) => {
     const matchesTab = activeTab === 'All' ? true : user.status === activeTab;
-    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) || user.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch =
+      (user?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (user?.email || '').toLowerCase().includes(searchTerm.toLowerCase());
     return matchesTab && matchesSearch;
   });
 
@@ -140,7 +172,7 @@ export default function AdminUsers() {
   const stats = {
     total: usersData.length,
     active: usersData.filter((u) => u.status === 'Active').length,
-    blocked: usersData.filter((u) => u.status === 'Blocked').length,
+    blocked: usersData.filter((u) => u.status === 'Blocked' || u.status === 'Suspended').length,
     new: usersData.filter((u) => u.joinedDate !== 'N/A').length, // Simulated
   };
 
@@ -185,7 +217,7 @@ export default function AdminUsers() {
             <div className="flex flex-col md:flex-row justify-between gap-4 items-center bg-white p-2 rounded-xl border border-slate-100 shadow-sm">
               {/* Tabs */}
               <div className="flex bg-slate-100 p-1 rounded-lg self-start w-full md:w-auto">
-                {(['All', 'Active', 'Blocked'] as const).map((tab) => (
+                {(['All', 'Active', 'Suspended'] as const).map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
@@ -282,15 +314,24 @@ export default function AdminUsers() {
                               <button onClick={() => setSelectedUser(user)} className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors" title="View Activity">
                                 <Eye size={18} />
                               </button>
-                              {user.status !== 'Blocked' ? (
-                                <button className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Block User">
-                                  <Lock size={18} />
-                                </button>
-                              ) : (
-                                <button className="p-2 text-slate-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors" title="Unblock User">
+                              <button
+                                onClick={() => handleSuspendUser(user)}
+                                disabled={actionLoading === user.id + '-suspend'}
+                                className={`p-2 rounded-lg transition-colors ${
+                                  user.status === 'Suspended'
+                                    ? 'text-green-600 hover:text-green-700 hover:bg-green-50'
+                                    : 'text-orange-500 hover:text-orange-600 hover:bg-orange-50'
+                                }`}
+                                title={user.status === 'Suspended' ? 'Unsuspend User' : 'Suspend User'}
+                              >
+                                {actionLoading === user.id + '-suspend' ? (
+                                  <Loader2 size={18} className="animate-spin" />
+                                ) : user.status === 'Suspended' ? (
                                   <CheckCircle size={18} />
-                                </button>
-                              )}
+                                ) : (
+                                  <Lock size={18} />
+                                )}
+                              </button>
                               <button className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete User">
                                 <Trash2 size={18} />
                               </button>
@@ -329,8 +370,22 @@ export default function AdminUsers() {
                       <button onClick={() => setSelectedUser(user)} className="flex-1 py-2 bg-slate-50 text-slate-600 text-sm font-medium rounded-lg hover:bg-slate-100 border border-slate-200">
                         View Details
                       </button>
-                      <button className="px-4 py-2 bg-white text-red-500 border border-red-200 rounded-lg hover:bg-red-50">
-                        <Lock size={18} />
+                      <button
+                        onClick={() => handleSuspendUser(user)}
+                        disabled={actionLoading === user.id + '-suspend'}
+                        className={`px-4 py-2 rounded-lg border ${
+                          user.status === 'Suspended'
+                            ? 'text-green-600 bg-green-50 border-green-200'
+                            : 'text-orange-500 bg-orange-50 border-orange-200'
+                        }`}
+                      >
+                        {actionLoading === user.id + '-suspend' ? (
+                          <Loader2 size={18} className="animate-spin" />
+                        ) : user.status === 'Suspended' ? (
+                          <CheckCircle size={18} />
+                        ) : (
+                          <Lock size={18} />
+                        )}
                       </button>
                     </div>
                   </div>
@@ -369,7 +424,20 @@ export default function AdminUsers() {
               <div className="flex justify-between items-end mb-4">
                 <img src={selectedUser.avatar} alt="" className="w-24 h-24 rounded-full border-4 border-white shadow-md bg-white" />
                 <div className="flex gap-2 mb-1">
-                  <button className="px-3 py-1.5 bg-red-50 text-red-600 text-xs font-bold rounded-lg border border-red-100 hover:bg-red-100">Block User</button>
+                  <button
+                    onClick={() => handleSuspendUser(selectedUser)}
+                    disabled={actionLoading === selectedUser.id + '-suspend'}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-lg border flex items-center gap-1.5 ${
+                      selectedUser.status === 'Suspended'
+                        ? 'bg-green-50 text-green-600 border-green-100 hover:bg-green-100'
+                        : 'bg-orange-50 text-orange-600 border-orange-100 hover:bg-orange-100'
+                    }`}
+                  >
+                    {actionLoading === selectedUser.id + '-suspend' ? (
+                      <Loader2 size={12} className="animate-spin" />
+                    ) : null}
+                    {selectedUser.status === 'Suspended' ? 'Unsuspend User' : 'Suspend User'}
+                  </button>
                   <button className="px-3 py-1.5 bg-slate-100 text-slate-600 text-xs font-bold rounded-lg hover:bg-slate-200">Reset Password</button>
                 </div>
               </div>

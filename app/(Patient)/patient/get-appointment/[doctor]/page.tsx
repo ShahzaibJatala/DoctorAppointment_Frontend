@@ -34,21 +34,23 @@ type TimeSlot = { time: string; period: TimePeriod };
 type DayOption = { label: string; date: Date; display: string; month: string };
 
 // ─── Static time slots ────────────────────────────────────────────────────────
-const TIME_SLOTS: TimeSlot[] = [
-  { time: '09:00 AM', period: 'Morning' },
-  { time: '09:30 AM', period: 'Morning' },
-  { time: '10:00 AM', period: 'Morning' },
-  { time: '10:30 AM', period: 'Morning' },
-  { time: '11:00 AM', period: 'Morning' },
-  { time: '11:30 AM', period: 'Morning' },
-  { time: '02:00 PM', period: 'Afternoon' },
-  { time: '02:30 PM', period: 'Afternoon' },
-  { time: '03:00 PM', period: 'Afternoon' },
-  { time: '04:00 PM', period: 'Afternoon' },
-  { time: '06:00 PM', period: 'Evening' },
-  { time: '06:30 PM', period: 'Evening' },
-  { time: '07:00 PM', period: 'Evening' },
-];
+function generate24HourSlots(): TimeSlot[] {
+  const slots: TimeSlot[] = [];
+  for (let hour = 0; hour < 24; hour++) {
+    for (let min = 0; min < 60; min += 30) {
+      const period = hour < 12 ? 'AM' : 'PM';
+      const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+      const displayMin = min === 0 ? '00' : min;
+      slots.push({
+        time: `${displayHour}:${displayMin} ${period}`,
+        period: hour < 12 ? 'Morning' : hour < 17 ? 'Afternoon' : 'Evening'
+      });
+    }
+  }
+  return slots;
+}
+
+const TIME_SLOTS: TimeSlot[] = generate24HourSlots();
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -139,13 +141,13 @@ function SlotGroup({
 }) {
   if (!slots.length) return null;
   return (
-    <div className="mb-5">
-      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2.5 flex items-center gap-2">
-        <span className="w-4 h-px bg-slate-200 inline-block" />
+    <div className="mb-4 sm:mb-5">
+      <p className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 sm:mb-2.5 flex items-center gap-2">
+        <span className="w-3 sm:w-4 h-px bg-slate-200 inline-block" />
         {title}
         <span className="flex-1 h-px bg-slate-200 inline-block" />
       </p>
-      <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-2">
+      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-1.5 sm:gap-2">
         {slots.map((slot, i) => {
           const isBooked = bookedSlots.includes(slot.time);
           return (
@@ -153,7 +155,7 @@ function SlotGroup({
               key={i}
               disabled={isBooked}
               onClick={() => onSelect(slot.time)}
-              className={`py-2.5 text-xs font-bold rounded-xl border-2 transition-all relative ${
+              className={`py-2 sm:py-2.5 text-[10px] sm:text-xs font-bold rounded-xl border-2 transition-all relative ${
                 isBooked
                   ? 'bg-slate-100 border-slate-200 text-slate-400 line-through cursor-not-allowed opacity-60'
                   : selected === slot.time
@@ -360,47 +362,25 @@ function GetAppointmentPageContent() {
   };
 
   const getFilteredTimeSlots = (date: Date) => {
-    if (!doctorProfile) return [];
-    const dayNamesFull = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const currentDayName = dayNamesFull[date.getDay()];
-    const slotsForDay = doctorProfile.availability?.filter((slot: any) => slot.day === currentDayName && slot.isAvailable) || [];
-    if (slotsForDay.length === 0) {
-      return [];
-    }
-    const parseTime = (str: string) => {
-      const [timePart, period] = str.split(' ');
-      let [hours, minutes] = timePart.split(':').map(Number);
-      if (period === 'PM' && hours !== 12) hours += 12;
-      if (period === 'AM' && hours === 12) hours = 0;
-      return hours + minutes / 60;
-    };
-    const parseHHMM = (str: string) => {
-      const [hours, minutes] = str.split(':').map(Number);
-      return hours + minutes / 60;
-    };
+    // Show all 24/7 slots, filter out past times for today
+    const now = new Date();
+    const isToday = date.getDate() === now.getDate() && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+    
     return TIME_SLOTS.filter((slot) => {
-      const slotTime = parseTime(slot.time);
-      return slotsForDay.some((avail: any) => {
-        const start = parseHHMM(avail.startTime);
-        const end = parseHHMM(avail.endTime);
-        const now = new Date();
-        const isToday = date.getDate() === now.getDate() && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
-        if (isToday) {
-          const slotDateTime = parseSlotToDateTime(date, slot.time);
-          if (slotDateTime <= now) return false;
-        }
-        return slotTime >= start && slotTime <= end;
-      });
+      if (!isToday) return true;
+      const slotDateTime = parseSlotToDateTime(date, slot.time);
+      return slotDateTime > now;
     });
   };
 
   const filteredSlots = useMemo(() => {
     return getFilteredTimeSlots(days[selectedDayIdx].date);
-  }, [doctorProfile, selectedDayIdx, days]);
+  }, [selectedDayIdx, days]);
 
-  const morning = filteredSlots.filter((s) => s.period === 'Morning');
-  const afternoon = filteredSlots.filter((s) => s.period === 'Afternoon');
-  const evening = filteredSlots.filter((s) => s.period === 'Evening');
+  // Show first 8 slots per period for better UX
+  const morning = filteredSlots.filter((s) => s.period === 'Morning').slice(0, 8);
+  const afternoon = filteredSlots.filter((s) => s.period === 'Afternoon').slice(0, 8);
+  const evening = filteredSlots.filter((s) => s.period === 'Evening').slice(0, 8);
 
   const bookedTimesForSelectedDay = useMemo(() => {
     if (!days[selectedDayIdx]) return [];
@@ -615,42 +595,42 @@ function GetAppointmentPageContent() {
         </div>
       </nav>
 
-      <div className="max-w-5xl mx-auto px-4 pt-8 grid grid-cols-1 lg:grid-cols-5 gap-8">
+      <div className="max-w-5xl mx-auto px-4 pt-6 sm:pt-8 grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-8">
         {/* ── LEFT: Doctor summary card (sticky) ── */}
-        <aside className="lg:col-span-2">
-          <div className="sticky top-20 space-y-4">
+        <aside className="lg:col-span-2 order-2 lg:order-1">
+          <div className="sticky top-16 sm:top-20 space-y-3 sm:space-y-4">
             {/* Doctor card */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-              <div className="flex items-center gap-4 mb-4">
-                <div className="relative">
-                  <img src={doctorImage} alt={doctorName} className="w-20 h-20 rounded-2xl object-cover border-2 border-slate-100 shadow" />
-                  <span className="absolute -bottom-1.5 -right-1.5 w-5 h-5 bg-green-500 rounded-full border-2 border-white" />
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 sm:p-5">
+              <div className="flex items-center gap-3 sm:gap-4 mb-3 sm:mb-4">
+                <div className="relative shrink-0">
+                  <img src={doctorImage} alt={doctorName} className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 border-slate-100 shadow" />
+                  <span className="absolute -bottom-1 -right-1 sm:-bottom-1.5 sm:-right-1.5 w-4 h-4 sm:w-5 sm:h-5 bg-green-500 rounded-full border-2 border-white" />
                 </div>
-                <div>
-                  <div className="flex items-center gap-1.5 mb-0.5">
-                    <h2 className="text-lg font-extrabold text-slate-900 leading-tight">{doctorName}</h2>
-                    <ShieldCheck size={16} className="text-teal-500 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1 sm:gap-1.5 mb-0.5">
+                    <h2 className="text-base sm:text-lg font-extrabold text-slate-900 leading-tight truncate">{doctorName}</h2>
+                    <ShieldCheck size={14} sm:size={16} className="text-teal-500 shrink-0" />
                   </div>
-                  <p className="text-teal-600 font-medium text-sm">{doctorSpecialty}</p>
+                  <p className="text-teal-600 font-medium text-xs sm:text-sm">{doctorSpecialty}</p>
                   <div className="flex items-center gap-1 mt-1">
                     {[...Array(5)].map((_, i) => (
-                      <Star key={i} size={12} className="text-yellow-400 fill-yellow-400" />
+                      <Star key={i} size={10} sm:size={12} className="text-yellow-400 fill-yellow-400" />
                     ))}
-                    <span className="text-xs text-slate-400 ml-1">4.9 (128)</span>
+                    <span className="text-[10px] sm:text-xs text-slate-400 ml-1">4.9 (128)</span>
                   </div>
                 </div>
               </div>
 
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between items-center py-2 border-t border-slate-50">
+              <div className="space-y-1.5 sm:space-y-2 text-xs sm:text-sm">
+                <div className="flex justify-between items-center py-1.5 sm:py-2 border-t border-slate-50">
                   <span className="text-slate-500">In-Clinic Fee</span>
                   <span className="font-bold text-slate-800">PKR {clinicConsultationFee}</span>
                 </div>
-                <div className="flex justify-between items-center py-2 border-t border-slate-50">
+                <div className="flex justify-between items-center py-1.5 sm:py-2 border-t border-slate-50">
                   <span className="text-slate-500">Video Fee</span>
                   <span className="font-bold text-slate-800">PKR {videoConsultationFee}</span>
                 </div>
-                <div className="flex justify-between items-center py-2 border-t border-slate-50">
+                <div className="flex justify-between items-center py-1.5 sm:py-2 border-t border-slate-50">
                   <span className="text-slate-500">Duration</span>
                   <span className="font-bold text-slate-800">30 mins</span>
                 </div>
@@ -658,36 +638,36 @@ function GetAppointmentPageContent() {
             </div>
 
             {/* Info pills */}
-            <div className="bg-teal-50 border border-teal-100 rounded-2xl p-4 space-y-2 text-sm text-teal-800">
+            <div className="bg-teal-50 border border-teal-100 rounded-2xl p-3 sm:p-4 space-y-1.5 sm:space-y-2 text-xs sm:text-sm text-teal-800">
               <p className="flex items-center gap-2">
-                <CheckCircle2 size={15} className="text-teal-600 shrink-0" /> Free cancellation within 24 hrs
+                <CheckCircle2 size={13} sm:size={15} className="text-teal-600 shrink-0" /> Free cancellation within 24 hrs
               </p>
               <p className="flex items-center gap-2">
-                <CheckCircle2 size={15} className="text-teal-600 shrink-0" /> Instant booking confirmation
+                <CheckCircle2 size={13} sm:size={15} className="text-teal-600 shrink-0" /> Instant booking confirmation
               </p>
               <p className="flex items-center gap-2">
-                <CheckCircle2 size={15} className="text-teal-600 shrink-0" /> No hidden charges
+                <CheckCircle2 size={13} sm:size={15} className="text-teal-600 shrink-0" /> No hidden charges
               </p>
             </div>
           </div>
         </aside>
 
         {/* ── RIGHT: Booking flow ── */}
-        <main className="lg:col-span-3">
+        <main className="lg:col-span-3 order-1 lg:order-2">
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
             {/* Panel header */}
-            <div className={`px-6 py-5 border-b border-slate-100 transition-colors ${step === 'confirmed' ? 'bg-teal-600' : 'bg-white'}`}>
-              <h1 className={`text-xl font-extrabold ${step === 'confirmed' ? 'text-white' : 'text-slate-900'}`}>
+            <div className={`px-4 sm:px-6 py-4 sm:py-5 border-b border-slate-100 transition-colors ${step === 'confirmed' ? 'bg-teal-600' : 'bg-white'}`}>
+              <h1 className={`text-lg sm:text-xl font-extrabold ${step === 'confirmed' ? 'text-white' : 'text-slate-900'}`}>
                 {step === 'datetime' && '🗓 Select Date & Time'}
                 {step === 'payment' && '💳 Complete Payment'}
                 {step === 'confirmed' && '✅ Appointment Confirmed!'}
               </h1>
               {step !== 'confirmed' && (
-                <p className="text-slate-500 text-sm mt-0.5">{step === 'datetime' ? 'Pick your preferred slot for the next 7 days' : 'Review and finalize your booking'}</p>
+                <p className="text-slate-500 text-xs sm:text-sm mt-0.5">{step === 'datetime' ? 'Pick your preferred slot for the next 7 days' : 'Review and finalize your booking'}</p>
               )}
             </div>
 
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               <StepIndicator step={step} />
 
               {/* ── STEP 1: Date & Time ── */}
@@ -695,18 +675,19 @@ function GetAppointmentPageContent() {
                 <div>
                   {/* Consultation type */}
                   {doctorProfile?.isVideoEnabled !== false && (
-                    <div className="flex p-1 bg-slate-100 rounded-xl mb-6">
+                    <div className="flex p-1 bg-slate-100 rounded-xl mb-4 sm:mb-6">
                       {(['Clinic', 'Video'] as BookingType[]).map((type) => (
                         <button
                           key={type}
                           onClick={() => setBookingType(type)}
-                          className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold rounded-lg transition-all ${
+                          className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-3 text-xs sm:text-sm font-bold rounded-lg transition-all ${
                             bookingType === type ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
                           }`}
                         >
-                          {type === 'Clinic' ? <MapPin size={16} /> : <Video size={16} />}
-                          <span>{type === 'Clinic' ? 'In-Clinic' : 'Video Call'}</span>
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${bookingType === type ? 'bg-teal-50 text-teal-600' : 'bg-slate-200 text-slate-500'}`}>
+                          {type === 'Clinic' ? <MapPin size={14} sm:size={16} /> : <Video size={14} sm:size={16} />}
+                          <span className="hidden sm:inline">{type === 'Clinic' ? 'In-Clinic' : 'Video Call'}</span>
+                          <span className="sm:hidden">{type === 'Clinic' ? 'Clinic' : 'Video'}</span>
+                          <span className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full font-semibold ${bookingType === type ? 'bg-teal-50 text-teal-600' : 'bg-slate-200 text-slate-500'}`}>
                             PKR {type === 'Clinic' ? clinicConsultationFee : videoConsultationFee}
                           </span>
                         </button>
@@ -715,9 +696,9 @@ function GetAppointmentPageContent() {
                   )}
 
                   {bookingType === 'Video' && (
-                    <div className="mb-6 rounded-2xl border border-teal-100 bg-teal-50/40 p-4">
-                      <p className="mb-3 text-sm font-bold text-slate-800">Choose video consultation method</p>
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="mb-4 sm:mb-6 rounded-2xl border border-teal-100 bg-teal-50/40 p-3 sm:p-4">
+                      <p className="mb-2 sm:mb-3 text-xs sm:text-sm font-bold text-slate-800">Choose video consultation method</p>
+                      <div className="grid grid-cols-1 gap-2 sm:gap-3 sm:grid-cols-2">
                         {[
                           { value: 'platform', label: 'Video on this platform', description: 'Receive an incoming call here with camera and microphone.' },
                           ...(doctorProfile?.allowWhatsAppVideoConsultation === true
@@ -728,10 +709,10 @@ function GetAppointmentPageContent() {
                             key={option.value}
                             type="button"
                             onClick={() => setVideoConsultationMethod(option.value as 'platform' | 'whatsapp')}
-                            className={`rounded-xl border-2 p-4 text-left transition ${videoConsultationMethod === option.value ? 'border-teal-500 bg-white' : 'border-slate-200 bg-white/60'}`}
+                            className={`rounded-xl border-2 p-3 sm:p-4 text-left transition ${videoConsultationMethod === option.value ? 'border-teal-500 bg-white' : 'border-slate-200 bg-white/60'}`}
                           >
-                            <span className="block text-sm font-bold text-slate-800">{option.label}</span>
-                            <span className="mt-1 block text-xs text-slate-500">{option.description}</span>
+                            <span className="block text-xs sm:text-sm font-bold text-slate-800">{option.label}</span>
+                            <span className="mt-0.5 sm:mt-1 block text-[10px] sm:text-xs text-slate-500">{option.description}</span>
                           </button>
                         ))}
                       </div>
@@ -739,33 +720,29 @@ function GetAppointmentPageContent() {
                   )}
 
                   {/* Date picker */}
-                  <div className="mb-6">
-                    <h3 className="font-bold text-slate-800 text-sm mb-3 flex items-center gap-2">
-                      <Calendar size={15} className="text-teal-600" /> Select Date
-                      <span className="ml-auto text-xs text-slate-400 font-normal">Next 7 days</span>
+                  <div className="mb-4 sm:mb-6">
+                    <h3 className="font-bold text-slate-800 text-xs sm:text-sm mb-2 sm:mb-3 flex items-center gap-2">
+                      <Calendar size={13} sm:size={15} className="text-teal-600" /> Select Date
+                      <span className="ml-auto text-[10px] sm:text-xs text-slate-400 font-normal">Next 7 days</span>
                     </h3>
                     <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide sm:grid sm:grid-cols-7 sm:overflow-visible sm:pb-0 sm:mx-0 sm:px-0">
                       {days.map((d, i) => {
-                        const isAvailable = isDayAvailableForDoctor(d.date);
                         return (
                           <button
                             key={i}
-                            disabled={!isAvailable}
                             onClick={() => {
                               setSelectedDayIdx(i);
                               setSelectedTime(null);
                             }}
-                            className={`flex flex-col items-center py-3 px-2 sm:px-0 min-w-[3.25rem] sm:min-w-0 shrink-0 sm:shrink rounded-xl border-2 transition-all ${
+                            className={`flex flex-col items-center py-2 sm:py-3 px-2 sm:px-0 min-w-[3rem] sm:min-w-0 shrink-0 sm:shrink rounded-xl border-2 transition-all ${
                               selectedDayIdx === i
                                 ? 'bg-teal-600 border-teal-600 text-white shadow-md'
-                                : !isAvailable
-                                  ? 'bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed opacity-50'
-                                  : 'bg-white border-slate-200 text-slate-600 hover:border-teal-300 hover:bg-teal-50/50'
+                                : 'bg-white border-slate-200 text-slate-600 hover:border-teal-300 hover:bg-teal-50/50'
                             }`}
                           >
-                            <span className="text-[9px] font-bold uppercase opacity-70">{d.label.slice(0, 3)}</span>
-                            <span className="text-lg font-extrabold leading-tight">{d.display}</span>
-                            <span className="text-[9px] opacity-60">{d.month}</span>
+                            <span className="text-[8px] sm:text-[9px] font-bold uppercase opacity-70">{d.label.slice(0, 3)}</span>
+                            <span className="text-base sm:text-lg font-extrabold leading-tight">{d.display}</span>
+                            <span className="text-[8px] sm:text-[9px] opacity-60">{d.month}</span>
                           </button>
                         );
                       })}

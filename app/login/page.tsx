@@ -144,10 +144,10 @@ const LoginContent = () => {
   return (
     <div className="flex min-h-screen">
       {/* Left Side - Login Form */}
-      <div className="flex w-full flex-col justify-center px-6 py-10 lg:w-1/2 lg:px-16 xl:px-24">
+      <div className="flex w-full flex-col justify-center px-6 py-6 lg:w-1/2 lg:px-16 xl:px-24">
         <div className="mx-auto w-full max-w-[420px]">
           {/* Logo */}
-          <Link href="/" className="mb-10 inline-flex items-center gap-2.5 group">
+          <Link href="/" className="mb-6 inline-flex items-center gap-2.5 group">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#16BCC8] to-[#0ea5a9] shadow-[0_2px_8px_rgba(22,188,200,0.3)] transition-transform duration-300 group-hover:scale-105">
               <Heart className="h-[18px] w-[18px] text-white" />
             </div>
@@ -157,7 +157,7 @@ const LoginContent = () => {
           <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Welcome back</h1>
           <p className="mt-2 text-slate-500">Sign in to access your appointments and health records</p>
 
-          <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+          <form onSubmit={handleSubmit} className="mt-5 space-y-4">
             
             {/* 👇 ERROR MESSAGE DISPLAY */}
             {loginError && (
@@ -244,7 +244,7 @@ const LoginContent = () => {
           </form>
 
           {/* Social Login & Signup Links */}
-          <div className="relative my-8">
+          <div className="relative my-5">
             <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-100" /></div>
             <div className="relative flex justify-center text-xs uppercase"><span className="bg-white px-3 text-slate-400 font-medium tracking-wider">Or continue with</span></div>
           </div>
@@ -258,7 +258,7 @@ const LoginContent = () => {
                Continue with Google
             </Button>
           </div>
-          <p className="mt-8 text-center text-sm text-slate-400">
+          <p className="mt-5 text-center text-sm text-slate-400">
             Don&apos;t have an account?{" "}
             <Link href="/register" className="font-semibold text-[#16BCC8] hover:text-[#0ea5a9] transition-colors duration-200">
               Sign up

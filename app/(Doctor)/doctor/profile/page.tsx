@@ -456,18 +456,18 @@ export default function DoctorProfileForm() {
                 <Input name="province" value={formData.province} onChange={handleInputChange} required placeholder="e.g. CA" />
               </div>
               <div>
-                <Label required>Clinic Latitude</Label>
-                <Input type="number" name="clinicLatitude" value={formData.clinicLatitude} onChange={handleInputChange} required placeholder="31.5204" />
+                <Label>Clinic Latitude</Label>
+                <Input type="number" name="clinicLatitude" value={formData.clinicLatitude} onChange={handleInputChange} placeholder="31.5204" step="any" />
               </div>
               <div>
-                <Label required>Clinic Longitude</Label>
-                <Input type="number" name="clinicLongitude" value={formData.clinicLongitude} onChange={handleInputChange} required placeholder="74.3587" />
+                <Label>Clinic Longitude</Label>
+                <Input type="number" name="clinicLongitude" value={formData.clinicLongitude} onChange={handleInputChange} placeholder="74.3587" step="any" />
               </div>
               <div className="md:col-span-2">
-                <button type="button" onClick={useCurrentClinicLocation} className="inline-flex items-center gap-2 rounded-xl bg-teal-50 px-4 py-2.5 text-sm font-bold text-teal-700 hover:bg-teal-100">
+                <button type="button" onClick={useCurrentClinicLocation} className="inline-flex items-center gap-2 rounded-xl bg-teal-50 px-4 py-2.5 text-sm font-bold text-teal-700 hover:bg-teal-100 transition-colors">
                   <MapPin size={16} /> Use My Current Clinic Location
                 </button>
-                <p className="mt-2 text-xs text-slate-400">Use this while physically present at the clinic, or enter the exact coordinates from Google Maps.</p>
+                <p className="mt-2 text-xs text-slate-400">Use this while physically present at the clinic, or enter the exact coordinates from Google Maps. Location is optional but recommended for better patient experience.</p>
               </div>
               {formData.clinicLatitude && formData.clinicLongitude && (
                 <div className="md:col-span-2 overflow-hidden rounded-2xl border border-slate-200">

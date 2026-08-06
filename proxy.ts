@@ -28,7 +28,9 @@ export function proxy(request: NextRequest) {
     pathname === '/login' || 
     pathname === '/register' ||
     pathname === '/' || 
-    pathname === '/favicon.ico'
+    pathname === '/favicon.ico' ||
+    pathname.startsWith('/patient/findDoctors') ||
+    pathname.startsWith('/patient/selected-doctor')
   ) {
     return NextResponse.next();
   }
@@ -59,9 +61,11 @@ export function proxy(request: NextRequest) {
     // 🔒 STRICT ROLE CHECKING
     // ==============================================================
     
+    const isPublicPatientRoute = pathname.startsWith('/patient/findDoctors') || pathname.startsWith('/patient/selected-doctor');
+
     // A. ADMIN blocking
     if (userRole === 'admin') {
-      if (rolePaths.patient.test(pathname) || rolePaths.doctor.test(pathname)) {
+      if (!isPublicPatientRoute && (rolePaths.patient.test(pathname) || rolePaths.doctor.test(pathname))) {
          return NextResponse.redirect(new URL('/admin/dashboard', request.url));
       }
     }
@@ -75,7 +79,7 @@ export function proxy(request: NextRequest) {
 
     // C. DOCTOR blocking
     if (userRole === 'doctor') {
-      if (rolePaths.admin.test(pathname) || rolePaths.patient.test(pathname)) {
+      if (!isPublicPatientRoute && (rolePaths.admin.test(pathname) || rolePaths.patient.test(pathname))) {
          return NextResponse.redirect(new URL('/doctor/profile', request.url));
       }
     }

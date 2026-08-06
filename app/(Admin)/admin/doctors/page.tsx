@@ -43,12 +43,14 @@ interface Doctor {
   specialty: string;
   hospital: string;
   experience: string;
-  rating: number;
+  rating: number | null;
   reviews: number;
   status: DoctorStatus;
   joinedDate: string;
   avatar: string;
   documents: string[];
+  totalPatients?: number;
+  totalIncome?: number;
 }
 
 // --- Components ---
@@ -298,6 +300,8 @@ export default function AdminDoctors() {
                         <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Doctor Name</th>
                         <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Specialty</th>
                         <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Contact</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Patients</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Total Income</th>
                         <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Status</th>
                         <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase text-right">Actions</th>
                       </tr>
@@ -305,7 +309,7 @@ export default function AdminDoctors() {
                     <tbody className="divide-y divide-slate-100">
                       {filteredDoctors.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="px-6 py-12 text-center text-slate-500">
+                          <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
                             No doctors found matching your criteria.
                           </td>
                         </tr>
@@ -319,7 +323,7 @@ export default function AdminDoctors() {
                                   <p className="font-bold text-slate-800 text-sm">{doc.name}</p>
                                   <div className="flex items-center gap-1 text-xs text-slate-500">
                                     <Star size={10} className="text-yellow-400 fill-yellow-400" />
-                                    {doc.rating > 0 ? doc.rating : 'N/A'}
+                                    {doc.rating !== null && doc.rating > 0 ? doc.rating : 'N/A'}
                                   </div>
                                 </div>
                               </div>
@@ -339,6 +343,12 @@ export default function AdminDoctors() {
                                   <Phone size={12} className="text-slate-400" /> {doc.phone}
                                 </span>
                               </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className="text-sm font-semibold text-slate-700">{doc.totalPatients ?? 0}</span>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className="text-sm font-bold text-teal-600">Rs. {(doc.totalIncome ?? 0).toLocaleString()}</span>
                             </td>
                             <td className="px-6 py-4">
                               <StatusBadge status={doc.status} />
@@ -469,6 +479,18 @@ export default function AdminDoctors() {
                     <label className="text-xs font-bold text-slate-400 uppercase">Phone</label>
                     <div className="flex items-center gap-2 mt-1 text-slate-700 font-medium">
                       <Phone size={16} className="text-teal-600" /> {selectedDoctor.phone}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-400 uppercase">Total Patients</label>
+                    <div className="flex items-center gap-2 mt-1 text-slate-800 font-bold text-base">
+                      <Users size={16} className="text-teal-600" /> {selectedDoctor.totalPatients ?? 0}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-400 uppercase">Total Income</label>
+                    <div className="flex items-center gap-2 mt-1 text-teal-600 font-extrabold text-base">
+                      Rs. {(selectedDoctor.totalIncome ?? 0).toLocaleString()}
                     </div>
                   </div>
                 </div>

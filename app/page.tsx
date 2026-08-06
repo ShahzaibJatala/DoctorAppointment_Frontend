@@ -1,221 +1,483 @@
-
-import { Button } from "@/components/UI/button";
-import { 
-  Search, 
-  Calendar, 
-  Shield, 
-  Clock, 
-  Star, 
-  CheckCircle2,
-  ArrowRight,
-  Users,
-  Stethoscope,
-  HeartPulse,
-  Sparkles,
-  Quote,
-} from "lucide-react";
-import { doctors } from "@/data/mockData";
-import DoctorCard from "@/components/shared/DoctorCard";
 import Link from "next/link";
 import Header from "@/components/layouts/header";
 import Footer from "@/components/layouts/footer";
+import LiveDoctorCard from "@/components/shared/LiveDoctorCard";
+import {
+  Search,
+  Calendar,
+  Shield,
+  Clock,
+  Star,
+  CheckCircle2,
+  ArrowRight,
+  Stethoscope,
+  HeartPulse,
+  Baby,
+  Brain,
+  Bone,
+  Eye,
+  Sparkles,
+  Video,
+  UserCheck,
+  BadgeCheck,
+  ChevronRight,
+  MessageCircle,
+} from "lucide-react";
 
+// ── Server-side data fetch (real doctors, no mock data) ─────────────────
+async function getTopDoctors() {
+  try {
+    const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || "http://localhost:3001";
+    const res = await fetch(`${serverUrl}/patient/allDoctors`, {
+      next: { revalidate: 60 },
+    });
+    if (!res.ok) return [];
+    const data: any[] = await res.json();
+    // Sort by rating desc, then take top 3
+    return data
+      .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))
+      .slice(0, 3);
+  } catch {
+    return [];
+  }
+}
 
-export default function Home() {
-    const stats = [
-      { value: "500+", label: "Expert Doctors", suffix: "" },
-      { value: "50K+", label: "Happy Patients", suffix: "" },
-      { value: "100+", label: "Specialties", suffix: "" },
-      { value: "4.9", label: "Average Rating", suffix: "★" },
-    ];
-  
-    const features = [
-      {
-        icon: Search,
-        title: "Find Your Doctor",
-        description: "Search through our network of qualified healthcare professionals by specialty, location, or availability.",
-        accent: "from-[#16BCC8] to-[#0ea5a9]",
-      },
-      {
-        icon: Calendar,
-        title: "Easy Booking",
-        description: "Book appointments online in seconds. Choose your preferred time slot and confirm instantly.",
-        accent: "from-blue-500 to-blue-600",
-      },
-      {
-        icon: Shield,
-        title: "Secure & Private",
-        description: "Your health data is protected with enterprise-grade security and HIPAA compliance.",
-        accent: "from-emerald-500 to-emerald-600",
-      },
-      {
-        icon: Clock,
-        title: "24/7 Availability",
-        description: "Access our platform anytime. Video consultations available for remote care.",
-        accent: "from-violet-500 to-violet-600",
-      },
-    ];
-  
-    const testimonials = [
-      {
-        name: "Sarah Johnson",
-        role: "Patient",
-        image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop&crop=face",
-        content: "MediBook made finding a specialist so easy. I booked my appointment in minutes and the doctor was excellent!",
-        rating: 5,
-      },
-      {
-        name: "Dr. Michael Chen",
-        role: "Cardiologist",
-        image: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=200&h=200&fit=crop&crop=face",
-        content: "As a doctor, this platform helps me manage my schedule efficiently and connect with patients seamlessly.",
-        rating: 5,
-      },
-      {
-        name: "Emily Davis",
-        role: "Patient",
-        image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200&h=200&fit=crop&crop=face",
-        content: "The video consultation feature is a game-changer. I got medical advice without leaving my home!",
-        rating: 5,
-      },
-    ];
-  
+// ── Specialty pills ─────────────────────────────────────────────────────
+const SPECIALTIES = [
+  { name: "Cardiology", icon: HeartPulse, color: "bg-red-50 text-red-600 border-red-100 hover:bg-red-100" },
+  { name: "Dermatology", icon: Sparkles, color: "bg-pink-50 text-pink-600 border-pink-100 hover:bg-pink-100" },
+  { name: "Pediatrics", icon: Baby, color: "bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100" },
+  { name: "Neurology", icon: Brain, color: "bg-purple-50 text-purple-600 border-purple-100 hover:bg-purple-100" },
+  { name: "Orthopedics", icon: Bone, color: "bg-amber-50 text-amber-600 border-amber-100 hover:bg-amber-100" },
+  { name: "General Practice", icon: Stethoscope, color: "bg-teal-50 text-teal-600 border-teal-100 hover:bg-teal-100" },
+  { name: "Psychiatry", icon: Brain, color: "bg-indigo-50 text-indigo-600 border-indigo-100 hover:bg-indigo-100" },
+  { name: "Ophthalmology", icon: Eye, color: "bg-cyan-50 text-cyan-600 border-cyan-100 hover:bg-cyan-100" },
+];
+
+// ── Steps (How It Works) ────────────────────────────────────────────────
+const HOW_STEPS = [
+  {
+    step: "01",
+    icon: Search,
+    title: "Find Your Doctor",
+    desc: "Search by specialty, name, or your symptoms. Filter by location, availability, and fee to find the right match.",
+    color: "from-[#16BCC8] to-[#0ea5a9]",
+    bg: "bg-[#16BCC8]/8",
+  },
+  {
+    step: "02",
+    icon: Calendar,
+    title: "Choose a Time Slot",
+    desc: "View the doctor's real-time availability and pick a slot that fits your schedule — in-person or video.",
+    color: "from-violet-500 to-violet-600",
+    bg: "bg-violet-50",
+  },
+  {
+    step: "03",
+    icon: UserCheck,
+    title: "Attend Your Visit",
+    desc: "Meet your doctor at the clinic or join a secure video call. Get the care you need, without the wait.",
+    color: "from-emerald-500 to-emerald-600",
+    bg: "bg-emerald-50",
+  },
+];
+
+// ── Why Choose Us ───────────────────────────────────────────────────────
+const FEATURES = [
+  {
+    icon: BadgeCheck,
+    title: "Verified Doctors Only",
+    desc: "Every doctor on MediBook is manually verified by our admin team before appearing on the platform.",
+    accent: "text-[#16BCC8]",
+    bg: "bg-[#16BCC8]/8",
+  },
+  {
+    icon: Video,
+    title: "Video Consultations",
+    desc: "Consult with a doctor from your home via secure video calls. No travel, no waiting rooms.",
+    accent: "text-violet-600",
+    bg: "bg-violet-50",
+  },
+  {
+    icon: Clock,
+    title: "Real-Time Availability",
+    desc: "See exactly when doctors are free and book instantly — no phone tag or waiting for callbacks.",
+    accent: "text-emerald-600",
+    bg: "bg-emerald-50",
+  },
+  {
+    icon: Shield,
+    title: "Your Privacy, Protected",
+    desc: "Your health data is encrypted and stored securely. We never share your information.",
+    accent: "text-blue-600",
+    bg: "bg-blue-50",
+  },
+];
+
+// ── Stats ───────────────────────────────────────────────────────────────
+const STATS = [
+  { value: "500+", label: "Expert Doctors" },
+  { value: "50K+", label: "Happy Patients" },
+  { value: "100+", label: "Specialties" },
+  { value: "4.9★", label: "Average Rating" },
+];
+
+export default async function Home() {
+  const topDoctors = await getTopDoctors();
 
   return (
     <div className="min-h-screen bg-white">
-    <Header />
+      <Header />
 
-      {/* ==================== HERO SECTION ==================== */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-white via-[#f0fafb] to-[#e8f7f9] pb-24 pt-16 lg:pb-36 lg:pt-24">
-        {/* Background Decorations */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -right-32 -top-32 h-[500px] w-[500px] rounded-full bg-[#16BCC8]/[0.04] blur-[80px]" />
-          <div className="absolute -bottom-32 -left-32 h-[400px] w-[400px] rounded-full bg-[#16BCC8]/[0.03] blur-[80px]" />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[600px] w-[600px] rounded-full bg-[#16BCC8]/[0.02] blur-[120px]" />
-          {/* Grid pattern */}
-          <div className="absolute inset-0 bg-[linear-gradient(rgba(22,188,200,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(22,188,200,0.02)_1px,transparent_1px)] bg-[size:60px_60px]" />
+      {/* ═══════════════════════════════════════════════════════════════
+          HERO SECTION
+      ═══════════════════════════════════════════════════════════════ */}
+      <section className="relative overflow-hidden bg-gradient-to-b from-white via-[#f4fbfc] to-[#e8f7f9] pt-10 pb-16 lg:pt-16 lg:pb-24">
+        {/* Soft blobs */}
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div className="absolute -right-40 -top-40 h-[600px] w-[600px] rounded-full bg-[#16BCC8]/[0.05] blur-[100px]" />
+          <div className="absolute -bottom-40 -left-40 h-[500px] w-[500px] rounded-full bg-[#16BCC8]/[0.04] blur-[100px]" />
+          <div className="absolute inset-0 bg-[linear-gradient(rgba(22,188,200,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(22,188,200,0.025)_1px,transparent_1px)] bg-[size:64px_64px]" />
         </div>
 
-        <div className="container relative mx-auto px-4">
-          <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-20">
-            {/* Hero Content */}
-            <div className="animate-fade-up text-center lg:text-left">
-              <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-[#16BCC8]/8 px-4 py-2 text-sm font-medium text-[#16BCC8] border border-[#16BCC8]/10">
-                <HeartPulse className="h-4 w-4" />
-                <span>Trusted by 50,000+ patients</span>
-                <Sparkles className="h-3.5 w-3.5 text-amber-400" />
-              </div>
+        <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 relative">
+          {/* ── Hero Content — centered ── */}
+          <div className="flex flex-col items-center text-center">
+            {/* Pill badge */}
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#16BCC8]/20 bg-white px-4 py-1.5 shadow-sm">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-xs font-semibold text-slate-600 tracking-wide uppercase">
+                Verified Doctors Available Now
+              </span>
+            </div>
 
-              <h1 className="text-4xl font-extrabold leading-[1.1] tracking-tight text-slate-900 sm:text-5xl lg:text-[3.5rem]">
-                Your Health, Our{" "}
-                <span className="relative">
-                  <span className="text-gradient">Priority</span>
-                  <svg className="absolute -bottom-2 left-0 w-full" viewBox="0 0 200 12" fill="none">
-                    <path d="M2 8C50 2 150 2 198 8" stroke="#16BCC8" strokeWidth="3" strokeLinecap="round" strokeOpacity="0.3" />
-                  </svg>
+            <h1 className="max-w-3xl text-4xl font-extrabold leading-[1.08] tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
+              Your Health,{" "}
+              <span className="relative inline-block">
+                <span className="text-gradient">Simplified.</span>
+                <svg
+                  className="absolute -bottom-2 left-0 w-full"
+                  viewBox="0 0 300 10"
+                  fill="none"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M2 6C80 1 220 1 298 6"
+                    stroke="#16BCC8"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeOpacity="0.35"
+                  />
+                </svg>
+              </span>
+            </h1>
+
+            <p className="mt-5 max-w-xl text-lg text-slate-500 leading-relaxed">
+              Book appointments with verified doctors in minutes. In-person visits or
+              video consultations — from your phone, any time.
+            </p>
+
+            {/* Search bar — invites action */}
+            <div className="mt-8 flex w-full max-w-lg items-center gap-3 rounded-2xl bg-white p-2 shadow-elevated border border-slate-100">
+              <div className="flex flex-1 items-center gap-2 pl-3">
+                <Search className="h-4 w-4 text-slate-400 flex-shrink-0" />
+                <span className="text-sm text-slate-400 select-none">Search by doctor, specialty, or symptom...</span>
+              </div>
+              <Link href="/patient/findDoctors">
+                <button className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#16BCC8] to-[#0ea5a9] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_3px_12px_rgba(22,188,200,0.35)] hover:shadow-[0_5px_20px_rgba(22,188,200,0.5)] transition-all duration-200 hover:scale-[1.02] cursor-pointer">
+                  Search
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+              </Link>
+            </div>
+
+            {/* Quick specialty pills */}
+            <div className="mt-5 flex flex-wrap justify-center gap-2">
+              {["Cardiology", "Dermatology", "Pediatrics", "Neurology", "General Practice"].map((s) => (
+                <Link key={s} href={`/patient/findDoctors?specialty=${encodeURIComponent(s)}`}>
+                  <span className="cursor-pointer rounded-full border border-slate-200 bg-white px-3.5 py-1 text-xs font-medium text-slate-600 hover:border-[#16BCC8]/40 hover:text-[#16BCC8] hover:bg-[#16BCC8]/5 transition-all duration-150">
+                    {s}
+                  </span>
+                </Link>
+              ))}
+            </div>
+
+            {/* Trust badges */}
+            <div className="mt-7 flex flex-wrap items-center justify-center gap-5 text-sm text-slate-500">
+              {["Verified Doctors", "Secure Booking", "Easy Rescheduling", "Free Cancellation"].map((b) => (
+                <span key={b} className="flex items-center gap-1.5">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                  {b}
                 </span>
-              </h1>
-
-              <p className="mt-6 text-lg text-slate-500 leading-relaxed lg:text-xl lg:max-w-lg">
-                Book appointments with top doctors in minutes. Quality healthcare 
-                made simple, accessible, and convenient for everyone.
-              </p>
-
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center lg:justify-start">
-                <Link href="/doctors">
-                  <Button variant="hero" size="xl" className="cursor-pointer text-white rounded-2xl shadow-[0_4px_20px_rgba(22,188,200,0.35)] hover:shadow-[0_6px_30px_rgba(22,188,200,0.45)] transition-all duration-300">
-                    Find a Doctor
-                    <ArrowRight className="ml-2 h-5 w-5" />
-                  </Button>
-                </Link>
-                <Link href="/register">
-                  <Button variant="outline" size="xl" className="cursor-pointer rounded-2xl border-slate-200 hover:border-[#16BCC8]/30 hover:bg-[#16BCC8]/5 transition-all duration-300">
-                    Join as Doctor
-                  </Button>
-                </Link>
-              </div>
-
-              {/* Trust Badges */}
-              <div className="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 lg:justify-start">
-                {["Verified Doctors", "Secure Booking", "Easy Rescheduling"].map((badge) => (
-                  <div key={badge} className="flex items-center gap-2">
-                    <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#20AC6B]/10">
-                      <CheckCircle2 className="h-3.5 w-3.5 text-[#20AC6B]" />
-                    </div>
-                    <span className="text-sm text-slate-500 font-medium">{badge}</span>
-                  </div>
-                ))}
-              </div>
+              ))}
             </div>
+          </div>
 
-            {/* Hero Image */}
-            <div className="relative animate-fade-up" style={{ animationDelay: "0.15s" }}>
-              <div className="relative mx-auto max-w-md lg:max-w-none">
-                {/* Main Image */}
-                <div className="aspect-square overflow-hidden rounded-3xl bg-gradient-to-br from-[#16BCC8] to-[#0ea5a9] p-[3px] shadow-[0_20px_60px_-15px_rgba(22,188,200,0.3)]">
-                  <div className="h-full w-full overflow-hidden rounded-[calc(1.5rem-3px)] bg-white">
-                    <img
-                      src="https://images.unsplash.com/photo-1631217868264-e5b90bb7e133?w=600&h=600&fit=crop"
-                      alt="Doctor with patient"
-                      className="h-full w-full object-cover"
-                    />
+          {/* ── Hero Illustration row ── */}
+          <div className="mt-14 grid grid-cols-1 gap-5 sm:grid-cols-3">
+            {[
+              { icon: Stethoscope, title: "Find a Doctor", desc: "Search 500+ verified specialists", color: "bg-[#16BCC8]/8 text-[#16BCC8]", href: "/patient/findDoctors" },
+              { icon: Video, title: "Video Consult", desc: "Meet doctors from anywhere", color: "bg-violet-50 text-violet-600", href: "/patient/findDoctors" },
+              { icon: HeartPulse, title: "Your Health Record", desc: "View your appointment history", color: "bg-emerald-50 text-emerald-600", href: "/patient/dashboard" },
+            ].map((card) => (
+              <Link key={card.title} href={card.href}>
+                <div className="group flex items-center gap-4 rounded-2xl border border-slate-100 bg-white p-5 shadow-card hover:shadow-elevated hover:-translate-y-0.5 transition-all duration-200 cursor-pointer">
+                  <div className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl ${card.color}`}>
+                    <card.icon className="h-5 w-5" />
                   </div>
-                </div>
-                
-                {/* Floating Cards */}
-                <div className="absolute -left-4 top-1/4 animate-float-gentle glass-card rounded-2xl p-4 shadow-elevated sm:-left-8">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#20AC6B]/10">
-                      <Users className="h-5 w-5 text-[#20AC6B]" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-slate-800">50+ Doctors</p>
-                      <p className="text-xs text-slate-400">Available Now</p>
-                    </div>
+                  <div>
+                    <p className="font-semibold text-slate-800 text-sm group-hover:text-[#16BCC8] transition-colors">{card.title}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">{card.desc}</p>
                   </div>
+                  <ChevronRight className="h-4 w-4 text-slate-300 ml-auto group-hover:text-[#16BCC8] group-hover:translate-x-0.5 transition-all" />
                 </div>
-
-                <div className="absolute -right-4 bottom-1/4 animate-float-gentle glass-card rounded-2xl p-4 shadow-elevated sm:-right-8" style={{ animationDelay: "2s" }}>
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-50">
-                      <Star className="h-5 w-5 text-[#F59F0A]" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-slate-800">4.9 Rating</p>
-                      <p className="text-xs text-slate-400">50K+ Reviews</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* New: Pulse indicator */}
-                <div className="absolute top-6 right-8 sm:top-8 sm:right-12">
-                  <div className="h-3 w-3 rounded-full bg-[#20AC6B] animate-pulse-ring" />
-                </div>
-              </div>
-            </div>
+              </Link>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* ==================== STATS SECTION ==================== */}
-      <section className="relative -mt-8 z-10 pb-8">
-        <div className="container mx-auto px-4">
-          <div className="glass-card rounded-2xl border border-white/60 shadow-elevated p-8">
-            <div className="grid grid-cols-2 gap-6 md:grid-cols-4 md:gap-8">
-              {stats.map((stat, index) => (
-                <div
-                  key={index}
-                  className={`text-center animate-fade-up stagger-${index + 1} ${
-                    index < stats.length - 1
-                      ? "md:border-r md:border-slate-100"
-                      : ""
-                  }`}
-                >
-                  <p className="text-3xl font-extrabold text-gradient tracking-tight lg:text-4xl">
-                    {stat.value}
-                    {stat.suffix && <span className="ml-1">{stat.suffix}</span>}
-                  </p>
-                  <p className="mt-1.5 text-sm text-slate-400 font-medium">{stat.label}</p>
+      {/* ═══════════════════════════════════════════════════════════════
+          STATS BAR
+      ═══════════════════════════════════════════════════════════════ */}
+      <section className="border-y border-slate-100 bg-white py-8">
+        <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
+            {STATS.map((stat, i) => (
+              <div
+                key={i}
+                className={`text-center ${i < STATS.length - 1 ? "md:border-r md:border-slate-100" : ""}`}
+              >
+                <p className="text-3xl font-extrabold text-gradient">{stat.value}</p>
+                <p className="mt-1 text-sm text-slate-400 font-medium">{stat.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════════════════
+          HOW IT WORKS
+      ═══════════════════════════════════════════════════════════════ */}
+      <section className="py-16 lg:py-20 bg-slate-50/60">
+        <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+          {/* Heading */}
+          <div className="mb-12 text-center">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#16BCC8]/15 bg-[#16BCC8]/8 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-[#16BCC8]">
+              Simple &amp; Fast
+            </div>
+            <h2 className="text-3xl font-extrabold tracking-tight text-slate-900 lg:text-4xl">
+              Book in 3 Easy Steps
+            </h2>
+            <p className="mt-3 text-base text-slate-500 max-w-xl mx-auto leading-relaxed">
+              No forms. No phone calls. Just open the app, find your doctor, and you're done.
+            </p>
+          </div>
+
+          {/* Steps */}
+          <div className="grid gap-6 md:grid-cols-3">
+            {HOW_STEPS.map((s, i) => (
+              <div key={i} className="group relative rounded-2xl border border-slate-100 bg-white p-7 shadow-card hover:shadow-elevated hover:-translate-y-1 transition-all duration-300">
+                {/* Step number */}
+                <div className="mb-5 flex items-center justify-between">
+                  <div className={`flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br ${s.color} shadow-lg`}>
+                    <s.icon className="h-5 w-5 text-white" />
+                  </div>
+                  <span className="text-4xl font-black text-slate-100 group-hover:text-slate-200 transition-colors select-none">{s.step}</span>
+                </div>
+                <h3 className="text-lg font-bold text-slate-800 mb-2">{s.title}</h3>
+                <p className="text-sm text-slate-500 leading-relaxed">{s.desc}</p>
+                {i < HOW_STEPS.length - 1 && (
+                  <div className="absolute -right-3 top-1/2 -translate-y-1/2 z-10 hidden md:flex h-6 w-6 items-center justify-center rounded-full bg-white border border-slate-200 shadow-sm">
+                    <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* CTA under steps */}
+          <div className="mt-10 flex justify-center">
+            <Link href="/patient/findDoctors">
+              <button className="flex items-center gap-2 rounded-2xl bg-gradient-to-r from-[#16BCC8] to-[#0ea5a9] px-8 py-3.5 text-sm font-bold text-white shadow-[0_4px_20px_rgba(22,188,200,0.35)] hover:shadow-[0_6px_30px_rgba(22,188,200,0.5)] transition-all duration-200 hover:scale-[1.02] cursor-pointer">
+                Find a Doctor Now
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════════════════
+          FEATURED DOCTORS (Real Data)
+      ═══════════════════════════════════════════════════════════════ */}
+      <section className="py-16 lg:py-20 bg-white">
+        <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col items-center justify-between gap-4 sm:flex-row mb-10">
+            <div>
+              <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#16BCC8]/15 bg-[#16BCC8]/8 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-[#16BCC8]">
+                Top Rated
+              </div>
+              <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">
+                Our Best Doctors
+              </h2>
+              <p className="mt-1.5 text-slate-500 text-sm">
+                Sorted by real patient ratings &amp; reviews
+              </p>
+            </div>
+            <Link
+              href="/patient/findDoctors"
+              className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 hover:border-[#16BCC8]/30 hover:text-[#16BCC8] hover:bg-[#16BCC8]/5 transition-all duration-200"
+            >
+              View All Doctors
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+
+          {topDoctors.length > 0 ? (
+            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+              {topDoctors.map((doctor) => (
+                <LiveDoctorCard key={doctor._id} doctor={doctor} />
+              ))}
+            </div>
+          ) : (
+            /* Fallback when no doctors yet */
+            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 py-16 text-center">
+              <Stethoscope className="mx-auto h-10 w-10 text-slate-300 mb-3" />
+              <p className="font-semibold text-slate-500">Doctors are being onboarded</p>
+              <p className="mt-1 text-sm text-slate-400">Check back soon — our network is growing daily.</p>
+              <Link href="/register">
+                <button className="mt-5 rounded-xl bg-[#16BCC8] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#0ea5a9] transition-colors cursor-pointer">
+                  Join as a Doctor
+                </button>
+              </Link>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════════════════
+          BROWSE BY SPECIALTY
+      ═══════════════════════════════════════════════════════════════ */}
+      <section className="py-16 lg:py-20 bg-slate-50/60">
+        <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="mb-10 text-center">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#16BCC8]/15 bg-[#16BCC8]/8 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-[#16BCC8]">
+              All Specialties
+            </div>
+            <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">
+              Browse by Specialty
+            </h2>
+            <p className="mt-2 text-slate-500 text-sm max-w-lg mx-auto">
+              Find the right specialist for your health needs, from cardiology to pediatrics.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-4">
+            {SPECIALTIES.map((sp) => (
+              <Link key={sp.name} href={`/patient/findDoctors?specialty=${encodeURIComponent(sp.name)}`}>
+                <div className={`group flex items-center gap-3 rounded-xl border p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md cursor-pointer ${sp.color}`}>
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/70"><sp.icon className="h-5 w-5" aria-hidden="true" /></span>
+                  <span className="text-sm font-semibold">{sp.name}</span>
+                  <ChevronRight className="ml-auto h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════════════════
+          WHY CHOOSE MEDIBOOK
+      ═══════════════════════════════════════════════════════════════ */}
+      <section className="py-16 lg:py-20 bg-white">
+        <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="mb-12 text-center">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#16BCC8]/15 bg-[#16BCC8]/8 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-[#16BCC8]">
+              Why MediBook
+            </div>
+            <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight lg:text-4xl">
+              Healthcare the Right Way
+            </h2>
+            <p className="mt-3 text-base text-slate-500 max-w-xl mx-auto leading-relaxed">
+              We built MediBook because accessing quality healthcare should be simple — not complicated.
+            </p>
+          </div>
+
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {FEATURES.map((f, i) => (
+              <div
+                key={i}
+                className="group rounded-2xl border border-slate-100 bg-white p-6 shadow-card hover:shadow-elevated hover:-translate-y-1 transition-all duration-300"
+              >
+                <div className={`mb-4 flex h-11 w-11 items-center justify-center rounded-xl ${f.bg}`}>
+                  <f.icon className={`h-5 w-5 ${f.accent}`} />
+                </div>
+                <h3 className="font-bold text-slate-800 mb-2">{f.title}</h3>
+                <p className="text-sm text-slate-500 leading-relaxed">{f.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════════════════
+          FOR DOCTORS SECTION
+      ═══════════════════════════════════════════════════════════════ */}
+      <section className="py-16 lg:py-20 bg-gradient-to-br from-slate-800 to-slate-900 relative overflow-hidden">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute -top-32 right-0 h-96 w-96 rounded-full bg-[#16BCC8]/10 blur-[80px]" />
+          <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:48px_48px]" />
+        </div>
+        <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 relative">
+          <div className="flex flex-col items-center gap-10 lg:flex-row lg:items-center lg:gap-16">
+            <div className="flex-1 text-center lg:text-left">
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-[#16BCC8]">
+                For Doctors
+              </div>
+              <h2 className="text-3xl font-extrabold text-white tracking-tight lg:text-4xl">
+                Grow Your Practice with MediBook
+              </h2>
+              <p className="mt-4 text-slate-400 leading-relaxed max-w-lg mx-auto lg:mx-0">
+                Join our network of verified doctors. Set your own hours, accept bookings online, and 
+                manage your patients — all from one dashboard.
+              </p>
+              <ul className="mt-6 space-y-3">
+                {["Manage appointments with ease", "Video consultations built-in", "Get discovered by thousands of patients", "Your data, your control"].map((item) => (
+                  <li key={item} className="flex items-center gap-3 text-sm text-slate-300">
+                    <CheckCircle2 className="h-4 w-4 text-[#16BCC8] flex-shrink-0" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row justify-center lg:justify-start">
+                <Link href="/register">
+                  <button className="flex items-center gap-2 rounded-xl bg-[#16BCC8] px-7 py-3 text-sm font-bold text-white hover:bg-[#0ea5a9] shadow-[0_4px_20px_rgba(22,188,200,0.3)] hover:shadow-[0_6px_30px_rgba(22,188,200,0.5)] transition-all duration-200 cursor-pointer">
+                    Join as a Doctor
+                    <ArrowRight className="h-4 w-4" />
+                  </button>
+                </Link>
+                <Link href="/login">
+                  <button className="flex items-center gap-2 rounded-xl border border-white/15 px-7 py-3 text-sm font-semibold text-white hover:bg-white/5 transition-all duration-200 cursor-pointer">
+                    Sign In
+                  </button>
+                </Link>
+              </div>
+            </div>
+            {/* Stats cards */}
+            <div className="grid grid-cols-2 gap-4 w-full max-w-sm">
+              {[
+                { icon: UserCheck, value: "500+", label: "Active Doctors", color: "text-[#16BCC8]", bg: "bg-[#16BCC8]/10" },
+                { icon: Star, value: "4.9", label: "Avg Rating", color: "text-amber-400", bg: "bg-amber-400/10" },
+                { icon: Calendar, value: "50K+", label: "Appointments", color: "text-violet-400", bg: "bg-violet-400/10" },
+                { icon: MessageCircle, value: "98%", label: "Satisfaction", color: "text-emerald-400", bg: "bg-emerald-400/10" },
+              ].map((s, i) => (
+                <div key={i} className="rounded-xl border border-white/8 bg-white/5 p-5 text-center">
+                  <div className={`mx-auto mb-3 flex h-9 w-9 items-center justify-center rounded-lg ${s.bg}`}>
+                    <s.icon className={`h-4 w-4 ${s.color}`} />
+                  </div>
+                  <p className={`text-2xl font-extrabold ${s.color}`}>{s.value}</p>
+                  <p className="mt-0.5 text-xs text-slate-400">{s.label}</p>
                 </div>
               ))}
             </div>
@@ -223,176 +485,42 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ==================== FEATURES SECTION ==================== */}
-      <section className="py-20 lg:py-28 bg-white">
-        <div className="container mx-auto px-4">
-          <div className="mx-auto max-w-2xl text-center">
-            <div className="inline-flex items-center gap-2 rounded-full bg-[#16BCC8]/8 px-4 py-1.5 text-xs font-semibold text-[#16BCC8] uppercase tracking-wider mb-4 border border-[#16BCC8]/10">
-              Our Features
-            </div>
-            <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight lg:text-4xl">
-              Why Choose MediBook?
-            </h2>
-            <p className="mt-4 text-lg text-slate-500 leading-relaxed">
-              We make healthcare accessible with modern technology and a patient-first approach.
-            </p>
-          </div>
-
-          <div className="mt-16 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-            {features.map((feature, index) => (
-              <div
-                key={index}
-                className={`group relative rounded-2xl border border-slate-100 bg-white p-7 transition-all duration-400 hover:border-[#16BCC8]/15 hover:shadow-elevated hover:-translate-y-1 animate-fade-up stagger-${index + 1}`}
-              >
-                {/* Gradient accent line */}
-                <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-transparent to-transparent transition-all duration-500 group-hover:via-[#16BCC8]/30 rounded-t-2xl" />
-                
-                <div className={`mb-5 flex h-13 w-13 items-center justify-center rounded-2xl bg-gradient-to-br ${feature.accent} shadow-lg transition-all duration-300 group-hover:scale-110 group-hover:shadow-xl`}>
-                  <feature.icon className="h-6 w-6 text-white" />
-                </div>
-                <h3 className="text-lg font-bold text-slate-800">
-                  {feature.title}
-                </h3>
-                <p className="mt-2.5 text-sm text-slate-400 leading-relaxed">
-                  {feature.description}
-                </p>
-              </div>
-            ))}
-          </div>
+      {/* ═══════════════════════════════════════════════════════════════
+          FINAL CTA
+      ═══════════════════════════════════════════════════════════════ */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-[#16BCC8] via-[#14b0bc] to-[#0ea5a9] py-16 lg:py-20">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute -top-20 -right-20 h-60 w-60 rounded-full bg-white/[0.08] blur-[40px]" />
+          <div className="absolute -bottom-20 -left-20 h-60 w-60 rounded-full bg-white/[0.05] blur-[40px]" />
+          <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:40px_40px]" />
         </div>
-      </section>
-
-      {/* ==================== FEATURED DOCTORS ==================== */}
-      <section className="bg-gradient-to-b from-slate-50/50 to-white py-20 lg:py-28">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full bg-[#16BCC8]/8 px-4 py-1.5 text-xs font-semibold text-[#16BCC8] uppercase tracking-wider mb-3 border border-[#16BCC8]/10">
-                Top Professionals
-              </div>
-              <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight lg:text-4xl">
-                Top Rated Doctors
-              </h2>
-              <p className="mt-2 text-slate-500">
-                Meet our highly qualified healthcare professionals
-              </p>
-            </div>
-            <Link href="/doctors">
-              <Button variant="outline" className="rounded-xl border-slate-200 hover:border-[#16BCC8]/30 hover:bg-[#16BCC8]/5 transition-all duration-300">
-                View All Doctors
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
+        <div className="mx-auto w-full max-w-2xl px-4 sm:px-6 text-center relative">
+          <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 shadow-[0_0_0_1px_rgba(255,255,255,0.2)] backdrop-blur-sm">
+            <HeartPulse className="h-7 w-7 text-white" />
+          </div>
+          <h2 className="text-3xl font-extrabold text-white tracking-tight lg:text-4xl">
+            Ready to Take Control of Your Health?
+          </h2>
+          <p className="mt-4 text-lg text-white/80 leading-relaxed">
+            Join thousands of patients who trust MediBook for fast, verified, and affordable healthcare.
+          </p>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row justify-center">
+            <Link href="/register">
+              <button className="flex items-center gap-2 rounded-2xl bg-white px-8 py-3.5 text-sm font-bold text-[#16BCC8] shadow-[0_4px_20px_rgba(0,0,0,0.12)] hover:shadow-[0_6px_30px_rgba(0,0,0,0.18)] transition-all duration-200 hover:scale-[1.02] cursor-pointer">
+                Get Started Free
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </Link>
+            <Link href="/patient/findDoctors">
+              <button className="flex items-center gap-2 rounded-2xl border border-white/25 px-8 py-3.5 text-sm font-semibold text-white hover:bg-white/10 backdrop-blur-sm transition-all duration-200 cursor-pointer">
+                Browse Doctors
+              </button>
             </Link>
           </div>
-
-          <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {doctors.slice(0, 3).map((doctor) => (
-              <DoctorCard key={doctor.id} doctor={doctor} />
-            ))}
-          </div>
         </div>
       </section>
 
-      {/* ==================== TESTIMONIALS ==================== */}
-      <section className="py-20 lg:py-28 bg-white">
-        <div className="container mx-auto px-4">
-          <div className="mx-auto max-w-2xl text-center">
-            <div className="inline-flex items-center gap-2 rounded-full bg-[#16BCC8]/8 px-4 py-1.5 text-xs font-semibold text-[#16BCC8] uppercase tracking-wider mb-4 border border-[#16BCC8]/10">
-              Testimonials
-            </div>
-            <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight lg:text-4xl">
-              What People Say
-            </h2>
-            <p className="mt-4 text-lg text-slate-500 leading-relaxed">
-              Trusted by thousands of patients and healthcare providers
-            </p>
-          </div>
-
-          <div className="mt-16 grid gap-6 md:grid-cols-3">
-            {testimonials.map((testimonial, index) => (
-              <div
-                key={index}
-                className={`group relative rounded-2xl border border-slate-100 bg-white p-7 shadow-card transition-all duration-400 hover:shadow-elevated hover:-translate-y-1 hover:border-[#16BCC8]/15 animate-fade-up stagger-${index + 1}`}
-              >
-                {/* Quote icon */}
-                <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-[#16BCC8]/8">
-                  <Quote className="h-5 w-5 text-[#16BCC8]" />
-                </div>
-
-                {/* Stars */}
-                <div className="flex items-center gap-0.5 mb-4">
-                  {[...Array(testimonial.rating)].map((_, i) => (
-                    <Star
-                      key={i}
-                      className="h-4 w-4 fill-[#F59F0A] text-[#F59F0A]"
-                    />
-                  ))}
-                </div>
-
-                <p className="text-slate-600 leading-relaxed text-[15px]">
-                  &ldquo;{testimonial.content}&rdquo;
-                </p>
-
-                <div className="mt-6 flex items-center gap-3 pt-5 border-t border-slate-50">
-                  <img
-                    src={testimonial.image}
-                    alt={testimonial.name}
-                    className="h-11 w-11 rounded-full object-cover ring-2 ring-white shadow-sm"
-                  />
-                  <div>
-                    <p className="font-semibold text-slate-800 text-sm">{testimonial.name}</p>
-                    <p className="text-xs text-slate-400">{testimonial.role}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ==================== CTA SECTION ==================== */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-[#16BCC8] via-[#14b0bc] to-[#0ea5a9] py-20 lg:py-24">
-        {/* Background decorations */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          <div className="absolute -top-20 -right-20 h-60 w-60 rounded-full bg-white/[0.06] blur-[40px]" />
-          <div className="absolute -bottom-20 -left-20 h-60 w-60 rounded-full bg-white/[0.04] blur-[40px]" />
-          <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:40px_40px]" />
-        </div>
-
-        <div className="container relative mx-auto px-4 text-center">
-          <div className="mx-auto max-w-2xl">
-            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/15 backdrop-blur-sm shadow-[0_0_0_1px_rgba(255,255,255,0.2)]">
-              <Stethoscope className="h-8 w-8 text-white" />
-            </div>
-            <h2 className="text-3xl font-extrabold text-white tracking-tight lg:text-4xl">
-              Ready to Take Control of Your Health?
-            </h2>
-            <p className="mt-4 text-lg text-white/80 leading-relaxed">
-              Join thousands of patients who trust MediBook for their healthcare needs.
-            </p>
-            <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-              <Link href="/register">
-                <Button variant="secondary" size="xl" className="bg-white text-[#16BCC8] hover:bg-white/90 cursor-pointer rounded-2xl font-bold shadow-[0_4px_20px_rgba(0,0,0,0.1)] hover:shadow-[0_6px_30px_rgba(0,0,0,0.15)] transition-all duration-300">
-                  Get Started Free
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
-              </Link>
-              <Link href="/doctors">
-                <Button 
-                  variant="outline" 
-                  size="xl"
-                  className="border-white/25 text-white hover:bg-white/10 cursor-pointer rounded-2xl backdrop-blur-sm transition-all duration-300"
-                >
-                  Browse Doctors
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
-
-    <Footer />
+      <Footer />
     </div>
-
   );
 }
